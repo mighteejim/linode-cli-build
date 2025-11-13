@@ -8,7 +8,7 @@ and runs an optional post-start hook to preload a model.
 
 | Setting | Value |
 | --- | --- |
-| Base image | `linode/ubuntu22.04` |
+| Base image | `linode/ubuntu24.04` |
 | Region (default) | `us-chi` |
 | Linode type (default) | `g6-standard-2` |
 | Container image | `ollama/ollama:latest` |

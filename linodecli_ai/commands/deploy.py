@@ -84,7 +84,7 @@ def _cmd_deploy(args, config) -> None:
     label = _build_label(app_name, env_name, timestamp)
     tags = _build_tags(app_name, env_name, template, deployment_id)
 
-    base_image = linode_cfg.get("image", "linode/ubuntu22.04")
+    base_image = linode_cfg.get("image", "linode/ubuntu24.04")
     print(f"Creating Linode {linode_type} in {region} (image: {base_image})...")
     instance = api.create_instance(
         region=region,

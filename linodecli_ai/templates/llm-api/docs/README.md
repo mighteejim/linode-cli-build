@@ -7,7 +7,7 @@ to expose an OpenAI-compatible HTTP endpoint backed by vLLM.
 
 | Setting | Value |
 | --- | --- |
-| Base image | `linode/ubuntu22.04` |
+| Base image | `linode/ubuntu24.04` |
 | Region (default) | `us-mia` |
 | Linode type (default) | `g6-standard-8` |
 | Container image | `vllm/vllm-openai:latest` |

@@ -193,7 +193,7 @@ Behavior:
    - Container image: `--image` or template container image.
 5. Generate **cloud-init** user data via `core/cloud_init.py`.
 6. Call **Linode API** to create a new Linode with:
-   - Region, type, base image (e.g. `linode/ubuntu22.04`).
+   - Region, type, base image (e.g. `linode/ubuntu24.04`).
    - `user_data`: cloud-init YAML.
    - Label: e.g. `build-ai-<app_name>-<env>-<timestamp>`.
    - Tags:

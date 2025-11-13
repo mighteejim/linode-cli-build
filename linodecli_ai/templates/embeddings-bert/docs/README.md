@@ -8,7 +8,7 @@ vector databases, or lightweight RAG experiments.
 
 | Setting | Value |
 | --- | --- |
-| Base image | `linode/ubuntu22.04` |
+| Base image | `linode/ubuntu24.04` |
 | Region (default) | `us-southeast` |
 | Linode type (default) | `g6-standard-2` |
 | Container image | `ghcr.io/huggingface/text-embeddings-inference:cpu-0.4` |
