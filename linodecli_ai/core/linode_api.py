@@ -52,6 +52,7 @@ class LinodeAPI:
         root_pass: str,
         group: str = "build-ai",
     ) -> Dict[str, Any]:
+        b64_user_data = base64.b64encode(user_data.encode("utf-8")).decode("utf-8")
         payload = {
             "type": linode_type,
             "region": region,
@@ -59,8 +60,8 @@ class LinodeAPI:
             "label": label,
             "tags": tags or [],
             "group": group,
-            "user_data": base64.b64encode(user_data.encode("utf-8")).decode("utf-8"),
             "root_pass": root_pass,
+            "metadata": {"user_data": b64_user_data},
         }
         response = self._request("post", "linode/instances", payload)
         return response

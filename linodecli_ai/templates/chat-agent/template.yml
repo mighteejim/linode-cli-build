@@ -37,3 +37,15 @@ env:
   optional:
     - name: OLLAMA_MODELS
       description: Comma separated models to pre-load, e.g. llama3
+
+guidance:
+  summary: |
+    Use the Ollama HTTP API exposed on port 80. Substitute your Linode's IP or hostname below.
+  examples:
+    - description: List loaded models
+      command: curl http://{host}/api/tags
+    - description: Generate text with llama3
+      command: |
+        curl -X POST http://{host}/api/generate \
+          -H 'Content-Type: application/json' \
+          -d '{"model":"llama3","prompt":"Hello!"}'

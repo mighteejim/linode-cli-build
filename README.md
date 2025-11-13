@@ -52,7 +52,7 @@ linode-cli ai status
 linode-cli ai destroy --app chat-agent --env default
 ```
 
-Deployments are tracked locally at `~/.config/linode-cli/ai-deployments.json`, which allows the `status` and `destroy` commands to operate without additional inputs.
+Deployments are tracked locally at `~/.config/linode-cli.d/ai/ai-deployments.json`, which allows the `status` and `destroy` commands to operate without additional inputs.
 
 ## Further Reading
 

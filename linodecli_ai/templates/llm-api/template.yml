@@ -38,3 +38,15 @@ env:
   optional:
     - name: VLLM_GPU_MEMORY_UTILIZATION
       description: Override GPU memory utilization fraction.
+
+guidance:
+  summary: |
+    The template exposes an OpenAI-compatible REST endpoint on port 80. Replace {host} with the Linode hostname or IP.
+  examples:
+    - description: Health check
+      command: curl http://{host}/health
+    - description: List models (OpenAI-compatible)
+      command: |
+        curl -X POST http://{host}/v1/models \
+          -H 'Content-Type: application/json' \
+          -d '{}'

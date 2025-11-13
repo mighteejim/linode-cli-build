@@ -11,8 +11,6 @@ import time
 import uuid
 from pathlib import Path
 from typing import Dict, Optional
-from urllib import error as url_error
-from urllib import request as url_request
 
 from ..core import cloud_init
 from ..core import env as env_core
@@ -125,9 +123,10 @@ def _cmd_deploy(args, config) -> None:
         instance = api.wait_for_status(linode_id, desired="running")
         record["last_status"] = instance.get("status")
         registry.update_fields(deployment_id, {"last_status": record["last_status"]})
-        health_cfg = container_cfg.get("health")
-        if health_cfg and health_cfg.get("type") == "http":
-            _perform_http_health_check(hostname, health_cfg)
+        print(
+            "Linode is running. Container start-up can take several minutes; "
+            "run `linode-cli ai status` to monitor health."
+        )
 
     print("")
     print(f"Deployed {template.display_name} (app: {app_name}, env: {env_name})")
@@ -136,6 +135,7 @@ def _cmd_deploy(args, config) -> None:
     print(f"Hostname:  {hostname}")
     if password_file:
         print(f"Root password saved to: {password_file}")
+    _print_next_steps(template, hostname)
 
 
 def _read_env_file(path: str, template) -> Dict[str, str]:
@@ -158,30 +158,6 @@ def _primary_ipv4(instance: Dict) -> str:
     if isinstance(ipv4_list, list) and ipv4_list:
         return ipv4_list[0]
     raise linode_api.LinodeAPIError("Instance response missing IPv4 address.")
-
-
-def _perform_http_health_check(hostname: str, health_cfg: Dict) -> None:
-    path = health_cfg.get("path", "/")
-    port = health_cfg.get("port", 80)
-    url = f"http://{hostname}:{port}{path}"
-    retries = int(health_cfg.get("max_retries", 30))
-    delay = int(health_cfg.get("initial_delay_seconds", 5))
-    timeout = int(health_cfg.get("timeout_seconds", 3))
-    success_codes = health_cfg.get("success_codes", [200])
-
-    print(f"Checking HTTP health at {url} ...")
-    for attempt in range(1, retries + 1):
-        try:
-            req = url_request.Request(url, method="GET")
-            with url_request.urlopen(req, timeout=timeout) as resp:
-                if resp.getcode() in success_codes:
-                    print("Health check passed.")
-                    return
-        except url_error.URLError:
-            pass
-        print(f"Attempt {attempt}/{retries} failed; retrying in {delay}s...")
-        time.sleep(delay)
-    raise RuntimeError("Health check failed after maximum retries.")
 
 
 _SAFE_CHAR_PATTERN = re.compile(r"[^A-Za-z0-9_.-]")
@@ -235,3 +211,24 @@ def _generate_root_password(length: int = 24) -> str:
             and any(c in "!@#$%^&*-_=+" for c in pwd)
         ):
             return pwd
+
+
+def _print_next_steps(template, hostname: str) -> None:
+    guidance = template.data.get("guidance") or {}
+    if not guidance:
+        return
+
+    summary = guidance.get("summary")
+    examples = guidance.get("examples", [])
+    print("")
+    if summary:
+        print(summary.strip())
+
+    for example in examples:
+        desc = example.get("description")
+        command = example.get("command", "").replace("{host}", hostname)
+        if desc:
+            print(f"- {desc}:")
+        if command:
+            print(command.strip())
+        print("")
