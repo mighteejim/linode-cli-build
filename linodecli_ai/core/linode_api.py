@@ -1,9 +1,13 @@
-"""Thin Linode API wrapper leveraging linode-cli client."""
+"""Thin Linode API wrapper using HTTP requests."""
 
 from __future__ import annotations
 
+import base64
+import json
 import time
 from typing import Any, Dict, Optional
+
+import requests
 
 
 class LinodeAPIError(RuntimeError):
@@ -11,11 +15,21 @@ class LinodeAPIError(RuntimeError):
 
 
 class LinodeAPI:
-    def __init__(self, config) -> None:
-        client = getattr(config, "client", None)
-        if client is None:
-            raise LinodeAPIError("linode-cli config missing API client")
-        self._client = client
+    def __init__(self, context) -> None:
+        token = getattr(context, "token", None)
+        client = getattr(context, "client", None)
+        if not token or client is None:
+            raise LinodeAPIError("Plugin context missing Linode CLI client or token")
+
+        self._base_url = getattr(client, "base_url", "https://api.linode.com/v4").rstrip("/")
+        self._session = requests.Session()
+        self._session.headers.update(
+            {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "User-Agent": getattr(client, "user_agent", "linode-cli-ai"),
+            }
+        )
 
     # API endpoints -----------------------------------------------------
 
@@ -37,9 +51,10 @@ class LinodeAPI:
             "label": label,
             "tags": tags or [],
             "group": group,
-            "user_data": user_data,
+            "user_data": base64.b64encode(user_data.encode("utf-8")).decode("utf-8"),
         }
-        return self._request("post", "linode/instances", payload)
+        response = self._request("post", "linode/instances", payload)
+        return response
 
     def get_instance(self, instance_id: int) -> Dict[str, Any]:
         return self._request("get", f"linode/instances/{instance_id}")
@@ -68,14 +83,24 @@ class LinodeAPI:
             f"Linode {instance_id} did not reach status {desired} within {timeout}s"
         )
 
-    def _request(self, method: str, path: str, payload: Optional[Dict[str, Any]] = None):
-        client_method = getattr(self._client, method, None)
-        if client_method is None:
-            raise LinodeAPIError(f"linode-cli client missing method {method}")
-        if payload is None:
-            response = client_method(path)
-        else:
-            response = client_method(path, payload)
-        if isinstance(response, dict) and response.get("errors"):
-            raise LinodeAPIError(str(response["errors"]))
-        return response
+    def _request(self, method: str, path: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        url = f"{self._base_url}/{path}"
+        try:
+            response = self._session.request(method.upper(), url, json=payload, timeout=120)
+        except requests.RequestException as exc:
+            raise LinodeAPIError(str(exc)) from exc
+
+        if response.status_code >= 400:
+            try:
+                detail = response.json()
+            except ValueError:
+                detail = response.text
+            raise LinodeAPIError(f"API error ({response.status_code}): {detail}")
+
+        if response.status_code == 204:
+            return {}
+
+        try:
+            return response.json()
+        except ValueError as exc:
+            raise LinodeAPIError("Failed to parse API response as JSON") from exc
