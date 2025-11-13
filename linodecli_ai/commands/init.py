@@ -9,6 +9,7 @@ from typing import List
 import yaml
 
 from ..core import templates as template_core
+from ..core.project import DEFAULT_MANIFEST
 
 
 def register(subparsers: argparse._SubParsersAction, _config) -> None:
@@ -26,7 +27,7 @@ def _cmd_init(args):
     template = template_core.load_template(args.template)
     target_dir = _resolve_directory(args.directory)
 
-    manifest_path = target_dir / "ai.linode.yml"
+    manifest_path = target_dir / DEFAULT_MANIFEST
     env_example_path = target_dir / ".env.example"
     readme_path = target_dir / "README.md"
 
@@ -60,7 +61,7 @@ def _resolve_directory(directory: str | None) -> Path:
         return target
 
     target = Path.cwd()
-    manifest = target / "ai.linode.yml"
+    manifest = target / DEFAULT_MANIFEST
     if manifest.exists():
         raise FileExistsError(
             f"{manifest} already exists in the current directory. Use --directory to target another path."
