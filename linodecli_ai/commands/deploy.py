@@ -5,10 +5,12 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import re
+import secrets
+import string
 import time
 import uuid
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 from urllib import error as url_error
 from urllib import request as url_request
 
@@ -28,6 +30,7 @@ def register(subparsers: argparse._SubParsersAction, config) -> None:
     parser.add_argument("--image", help="Override container image")
     parser.add_argument("--app-name", help="Override app name for tagging")
     parser.add_argument("--env", dest="env_name", help="Override environment name")
+    parser.add_argument("--root-pass", help="Root password to use for the Linode. If omitted, a secure password is generated and saved locally.")
     parser.add_argument(
         "--wait",
         action="store_true",
@@ -76,6 +79,7 @@ def _cmd_deploy(args, config) -> None:
     user_data = cloud_init.generate_cloud_init(config_obj)
 
     api = linode_api.LinodeAPI(config)
+    root_pass, password_file = _determine_root_password(args.root_pass)
     deployment_id = str(uuid.uuid4())
     timestamp = dt.datetime.utcnow().strftime("%m%d%H%M")
     label = _build_label(app_name, env_name, timestamp)
@@ -90,6 +94,7 @@ def _cmd_deploy(args, config) -> None:
         label=label,
         tags=tags,
         user_data=user_data,
+        root_pass=root_pass,
     )
     linode_id = instance["id"]
     ipv4 = _primary_ipv4(instance)
@@ -129,6 +134,8 @@ def _cmd_deploy(args, config) -> None:
     print(f"Linode ID: {linode_id}")
     print(f"IPv4:      {ipv4}")
     print(f"Hostname:  {hostname}")
+    if password_file:
+        print(f"Root password saved to: {password_file}")
 
 
 def _read_env_file(path: str, template) -> Dict[str, str]:
@@ -206,3 +213,25 @@ def _build_tags(app_name: str, env_name: str, template, deployment_id: str):
         _build_tag("ai-tver", template.version),
         _build_tag("ai-deploy", deployment_id[:12]),
     ]
+
+
+def _determine_root_password(provided: Optional[str]):
+    if provided:
+        return provided, None
+    password = _generate_root_password()
+    password_path = Path.cwd() / "linode-root-password.txt"
+    password_path.write_text(password + "\n", encoding="utf-8")
+    return password, password_path
+
+
+def _generate_root_password(length: int = 24) -> str:
+    alphabet = string.ascii_lowercase + string.ascii_uppercase + string.digits + "!@#$%^&*-_=+"
+    while True:
+        pwd = "".join(secrets.choice(alphabet) for _ in range(length))
+        if (
+            any(c.islower() for c in pwd)
+            and any(c.isupper() for c in pwd)
+            and any(c.isdigit() for c in pwd)
+            and any(c in "!@#$%^&*-_=+" for c in pwd)
+        ):
+            return pwd
