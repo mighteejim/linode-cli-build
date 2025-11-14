@@ -18,6 +18,11 @@ deploy:
       - huggingface
     container:
       image: ghcr.io/huggingface/text-embeddings-inference:cpu-0.4
+      command: >
+        --model-id sentence-transformers/all-mpnet-base-v2
+        --hostname 0.0.0.0
+        --port 80
+        --json-output
       internal_port: 3000
       external_port: 80
       env:
