@@ -30,10 +30,27 @@ When you deploy this template, cloud-init automatically:
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `HF_TOKEN` | **Yes** | Hugging Face token with access to the specified model (defaults to `meta-llama/Meta-Llama-3-8B-Instruct`). |
-| `VLLM_GPU_MEMORY_UTILIZATION` | No | Override GPU memory utilization fraction (default: 0.9). |
+| `HF_TOKEN` | **Yes** | Hugging Face token with access to the model you want to deploy. |
+| `MODEL_NAME` | No | HuggingFace model to load (default: `meta-llama/Meta-Llama-3-8B-Instruct`). |
+| `MAX_MODEL_LEN` | No | Maximum model context length (default: `16384`). |
+| `VLLM_GPU_MEMORY_UTILIZATION` | No | GPU memory utilization fraction (default: `0.9`). |
 
-You may also override `MODEL_NAME` by editing `ai.linode.yml` or providing an env var; the template sets `MODEL_NAME` via the container defaults.
+### Popular Models
+
+You can override `MODEL_NAME` in your `.env` file to use different models:
+
+```bash
+# Open-source alternatives that don't require gating
+MODEL_NAME=microsoft/Phi-3-mini-4k-instruct
+MODEL_NAME=mistralai/Mistral-7B-Instruct-v0.3
+MODEL_NAME=Qwen/Qwen2.5-7B-Instruct
+
+# Gated models (require HF access approval)
+MODEL_NAME=meta-llama/Meta-Llama-3-8B-Instruct
+MODEL_NAME=meta-llama/Meta-Llama-3-70B-Instruct
+```
+
+**Note:** Larger models (13B+) require larger instance types with more GPU memory.
 
 ## Usage
 
@@ -41,7 +58,13 @@ You may also override `MODEL_NAME` by editing `ai.linode.yml` or providing an en
 linode-cli ai init llm-api --directory llm-demo
 cd llm-demo
 cp .env.example .env
-echo "HF_TOKEN=hf_xxx" >> .env
+
+# Edit .env file with your settings
+cat >> .env <<EOF
+HF_TOKEN=hf_xxx
+MODEL_NAME=meta-llama/Meta-Llama-3-8B-Instruct
+EOF
+
 linode-cli ai deploy --region us-mia --linode-type g6-standard-8 --image linode/ubuntu22.04 --wait
 ```
 

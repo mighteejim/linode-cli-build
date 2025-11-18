@@ -22,7 +22,7 @@ deploy:
       internal_port: 8000
       external_port: 80
       requires_gpu: true
-      command: --model ${MODEL_NAME:-meta-llama/Meta-Llama-3-8B-Instruct} --max-model-len 16384
+      command: --model ${MODEL_NAME:-meta-llama/Meta-Llama-3-8B-Instruct} --max-model-len ${MAX_MODEL_LEN:-16384}
       env:
         MODEL_NAME: meta-llama/Meta-Llama-3-8B-Instruct
         HUGGING_FACE_HUB_TOKEN: ${HF_TOKEN}
@@ -40,12 +40,21 @@ env:
     - name: HF_TOKEN
       description: Hugging Face token to download gated models.
   optional:
+    - name: MODEL_NAME
+      description: HuggingFace model to load (default meta-llama/Meta-Llama-3-8B-Instruct).
+    - name: MAX_MODEL_LEN
+      description: Maximum model context length (default 16384).
     - name: VLLM_GPU_MEMORY_UTILIZATION
-      description: Override GPU memory utilization fraction (default 0.9).
+      description: GPU memory utilization fraction (default 0.9).
 
 guidance:
   summary: |
     The template exposes an OpenAI-compatible REST endpoint on port 80. Replace {host} with the Linode hostname or IP.
+    
+    Configure the model by setting MODEL_NAME in your .env file. Popular options:
+    - meta-llama/Meta-Llama-3-8B-Instruct (default, requires HF access)
+    - mistralai/Mistral-7B-Instruct-v0.3 (open-source)
+    - microsoft/Phi-3-mini-4k-instruct (open-source, smaller)
   examples:
     - description: Health check
       command: curl http://{host}/health
