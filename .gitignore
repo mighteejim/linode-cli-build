@@ -1,5 +1,35 @@
+# macOS
 .DS_Store
+
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Temporary files
 tmp/
-linodecli_ai.egg-info/
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+
+# Local testing
+test-*.sh
+debug-*.sh
+diagnose-*.sh
+verify-*.sh
+*.test.py
+
+# Docker
+Dockerfile.test
+Dockerfile.debug
+
+# Project-specific
+linode-root-password.txt
+ai-deployments.json

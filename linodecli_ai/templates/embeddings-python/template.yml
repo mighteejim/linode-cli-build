@@ -1,0 +1,64 @@
+name: embeddings-python
+display_name: Embeddings (Python)
+version: 0.1.0
+
+description: >
+  Sentence-transformers embedding service using Python. Drop-in replacement for TEI
+  that avoids Rust hf-hub issues. Works reliably on all platforms.
+
+deploy:
+  target: linode
+  linode:
+    image: linode/ubuntu24.04
+    region_default: us-southeast
+    type_default: g6-standard-2
+    tags:
+      - ai
+      - embeddings
+      - python
+    container:
+      image: python:3.11-slim
+      command: >
+        bash -c 'pip install -q sentence-transformers fastapi uvicorn[standard] && 
+        printf "from sentence_transformers import SentenceTransformer\n" > /app.py &&
+        printf "from fastapi import FastAPI\n" >> /app.py &&
+        printf "from pydantic import BaseModel\n" >> /app.py &&
+        printf "from typing import List\n" >> /app.py &&
+        printf "import uvicorn, sys\n\n" >> /app.py &&
+        printf "print(\"Loading model...\", file=sys.stderr, flush=True)\n" >> /app.py &&
+        printf "app = FastAPI()\n" >> /app.py &&
+        printf "model = SentenceTransformer(\"sentence-transformers/all-mpnet-base-v2\")\n" >> /app.py &&
+        printf "print(\"Model loaded!\", file=sys.stderr, flush=True)\n\n" >> /app.py &&
+        printf "class EmbedRequest(BaseModel):\n    inputs: List[str]\n\n" >> /app.py &&
+        printf "@app.get(\"/health\")\ndef health():\n    return {\"status\": \"ok\"}\n\n" >> /app.py &&
+        printf "@app.post(\"/embed\")\ndef embed(req: EmbedRequest):\n    return model.encode(req.inputs).tolist()\n\n" >> /app.py &&
+        printf "if __name__ == \"__main__\":\n    uvicorn.run(app, host=\"0.0.0.0\", port=80)\n" >> /app.py &&
+        python /app.py'
+      internal_port: 80
+      external_port: 80
+      health:
+        type: http
+        path: /health
+        port: 80
+        success_codes: [200]
+        initial_delay_seconds: 120
+        timeout_seconds: 10
+        max_retries: 90
+
+env:
+  required: []
+  optional:
+    - name: HF_TOKEN
+      description: Optional Hugging Face token for gated/private models.
+
+guidance:
+  summary: |
+    Python-based embeddings API compatible with TEI interface.
+  examples:
+    - description: Health check
+      command: curl http://{host}/health
+    - description: Generate embeddings
+      command: |
+        curl -X POST http://{host}/embed \
+          -H 'Content-Type: application/json' \
+          -d '{"inputs":["Hello from Linode"]}'

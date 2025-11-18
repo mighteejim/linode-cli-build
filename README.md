@@ -40,6 +40,12 @@ You can unregister with `linode-cli unregister-plugin ai` if you need to clean u
 | `linode-cli ai status` | Show deployment status/health from the registry and Linode API |
 | `linode-cli ai destroy` | Tear down deployments and clean the registry |
 
+## Available Templates
+
+- **chat-agent**: Ollama-based chat agent (llama3)
+- **llm-api**: vLLM-based text generation API (OpenAI-compatible)
+- **embeddings-python**: Sentence-transformers embeddings server (all-mpnet-base-v2)
+
 ## Typical Workflow
 
 ```bash
