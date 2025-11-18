@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from importlib import resources
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
+
+from .registry import TemplateRegistryClient, RegistryConfig
 
 
 class TemplateError(RuntimeError):
@@ -69,12 +72,40 @@ def list_template_records() -> List[TemplateRecord]:
     return list(_INDEX)
 
 
-def load_template(name: str) -> Template:
-    """Load a specific template by name."""
+def load_template(name: str, version: Optional[str] = None) -> Template:
+    """Load a specific template by name.
+    
+    Args:
+        name: Template name (optionally with version like 'name@0.1.0')
+        version: Specific version to load (overrides version in name)
+    
+    Returns:
+        Loaded Template instance
+        
+    Loading order:
+    1. Check cache
+    2. Try to load from cached remote templates
+    3. Fall back to bundled templates
+    """
+    # Parse version from name if present (e.g., 'template@0.1.0')
+    if '@' in name:
+        name, parsed_version = name.split('@', 1)
+        if version is None:
+            version = parsed_version
+    
     normalized = name.strip()
-    if normalized in _TEMPLATE_CACHE:
-        return _TEMPLATE_CACHE[normalized]
-
+    cache_key = f"{normalized}@{version}" if version else normalized
+    
+    if cache_key in _TEMPLATE_CACHE:
+        return _TEMPLATE_CACHE[cache_key]
+    
+    # Try to load from cached remote templates first
+    template = _load_from_remote_cache(normalized, version)
+    if template is not None:
+        _TEMPLATE_CACHE[cache_key] = template
+        return template
+    
+    # Fall back to bundled templates
     record = _find_record(normalized)
     if record is None:
         raise TemplateNotFoundError(f"Unknown template: {name}")
@@ -90,7 +121,7 @@ def load_template(name: str) -> Template:
         description=data.get("description", "").strip(),
         data=data,
     )
-    _TEMPLATE_CACHE[normalized] = template
+    _TEMPLATE_CACHE[cache_key] = template
     return template
 
 
@@ -99,6 +130,47 @@ def _find_record(name: str) -> Optional[TemplateRecord]:
         if record.name == name:
             return record
     return None
+
+
+def _load_from_remote_cache(name: str, version: Optional[str] = None) -> Optional[Template]:
+    """Try to load template from cached remote templates."""
+    try:
+        client = TemplateRegistryClient(RegistryConfig.load_from_file())
+        cache_dir = client.config.cache_dir
+        
+        template_dir = cache_dir / name
+        if not template_dir.exists():
+            # Template not cached, try to download it
+            try:
+                template_dir = client.download_template(name, version=version)
+            except Exception:
+                # Download failed, return None to fall back to bundled
+                return None
+        
+        template_yml = template_dir / "template.yml"
+        if not template_yml.exists():
+            return None
+        
+        with open(template_yml) as f:
+            data = yaml.safe_load(f)
+        
+        if not isinstance(data, dict):
+            return None
+        
+        # Check version match if specified
+        if version and data.get("version") != version:
+            return None
+        
+        return Template(
+            name=data.get("name", name),
+            display_name=data.get("display_name", name),
+            version=str(data.get("version", "0.0.0")),
+            description=data.get("description", "").strip(),
+            data=data,
+        )
+    except Exception:
+        # If anything fails, return None to fall back to bundled
+        return None
 
 
 def _load_yaml_resource(relative_path: str) -> Any:

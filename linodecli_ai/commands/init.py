@@ -14,7 +14,7 @@ from ..core.project import DEFAULT_MANIFEST
 
 def register(subparsers: argparse._SubParsersAction, _config) -> None:
     parser = subparsers.add_parser("init", help="Initialize a project from a template")
-    parser.add_argument("template", help="Template name to initialize")
+    parser.add_argument("template", help="Template name to initialize (e.g., 'chat-agent' or 'chat-agent@0.2.0')")
     parser.add_argument(
         "--directory",
         "-d",
@@ -24,7 +24,15 @@ def register(subparsers: argparse._SubParsersAction, _config) -> None:
 
 
 def _cmd_init(args):
-    template = template_core.load_template(args.template)
+    # Parse template name and version (e.g., 'chat-agent@0.2.0')
+    template_spec = args.template
+    version = None
+    if '@' in template_spec:
+        template_name, version = template_spec.split('@', 1)
+    else:
+        template_name = template_spec
+    
+    template = template_core.load_template(template_name, version=version)
     target_dir = _resolve_directory(args.directory)
 
     manifest_path = target_dir / DEFAULT_MANIFEST
