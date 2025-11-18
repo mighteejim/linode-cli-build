@@ -71,12 +71,30 @@ def _cmd_deploy(args, config) -> None:
     env_file = args.env_file or manifest.get("env", {}).get("file") or ".env"
     env_values = _read_env_file(env_file, template)
     template_env = container_cfg.get("env", {})
-    merged_env = {**template_env, **env_values}
+    
+    # Expand ${VAR} references in template env values
+    expanded_template_env = {}
+    for key, value in template_env.items():
+        if isinstance(value, str) and "${" in value:
+            # Simple variable expansion: ${VAR} or ${VAR:-default}
+            import re
+            def replace_var(match):
+                var_expr = match.group(1)
+                if ":-" in var_expr:
+                    var_name, default = var_expr.split(":-", 1)
+                    return env_values.get(var_name.strip(), default.strip())
+                else:
+                    return env_values.get(var_expr.strip(), "")
+            value = re.sub(r'\$\{([^}]+)\}', replace_var, value)
+        expanded_template_env[key] = value
+    
+    merged_env = {**expanded_template_env, **env_values}
     merged_env["BUILD_AI_APP_NAME"] = app_name
     merged_env["BUILD_AI_ENV"] = env_name
 
     internal_port = int(container_cfg.get("internal_port") or 8000)
     external_port = int(container_cfg.get("external_port") or 80)
+    requires_gpu = container_cfg.get("requires_gpu", False)
 
     config_obj = cloud_init.CloudInitConfig(
         container_image=container_image,
@@ -85,6 +103,7 @@ def _cmd_deploy(args, config) -> None:
         env_vars=merged_env,
         post_start_script=container_cfg.get("post_start_script"),
         command=container_cfg.get("command"),
+        requires_gpu=requires_gpu,
     )
     user_data = cloud_init.generate_cloud_init(config_obj)
 

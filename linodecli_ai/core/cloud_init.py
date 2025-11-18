@@ -16,10 +16,21 @@ class CloudInitConfig:
     env_vars: Dict[str, str] = field(default_factory=dict)
     post_start_script: Optional[str] = None
     command: Optional[str] = None
+    requires_gpu: bool = False
 
 
 def generate_cloud_init(config: CloudInitConfig) -> str:
     """Render a cloud-init YAML payload for provisioning the Linode."""
+    
+    # If GPU is required, add bootcmd to blacklist Nouveau early
+    bootcmd = []
+    if config.requires_gpu:
+        bootcmd = [
+            "echo 'blacklist nouveau' > /etc/modprobe.d/blacklist-nouveau.conf",
+            "echo 'options nouveau modeset=0' >> /etc/modprobe.d/blacklist-nouveau.conf",
+            "update-initramfs -u || true",
+        ]
+    
     write_files = [
         {
             "path": "/etc/build-ai.env",
@@ -39,6 +50,11 @@ def generate_cloud_init(config: CloudInitConfig) -> str:
         "write_files": write_files,
         "runcmd": [["/bin/sh", "/usr/local/bin/start-container.sh"]],
     }
+    
+    # Add bootcmd if GPU required
+    if bootcmd:
+        doc["bootcmd"] = bootcmd
+    
     return "#cloud-config\n" + yaml.safe_dump(doc, sort_keys=False)
 
 
@@ -59,6 +75,7 @@ def _render_start_script(config: CloudInitConfig) -> str:
         "IMAGE=\"%s\"" % config.container_image,
         "EXTERNAL_PORT=%d" % config.external_port,
         "INTERNAL_PORT=%d" % config.internal_port,
+        "REQUIRES_GPU=%s" % ("true" if config.requires_gpu else "false"),
         "",
         "install_docker() {",
         "  if command -v docker >/dev/null 2>&1; then",
@@ -68,6 +85,9 @@ def _render_start_script(config: CloudInitConfig) -> str:
         "    export DEBIAN_FRONTEND=noninteractive",
         "    apt-get update",
         "    apt-get install -y docker.io",
+        "    # Configure for faster pulls",
+        "    mkdir -p /etc/docker",
+        "    echo '{\"max-concurrent-downloads\": 10}' > /etc/docker/daemon.json",
         "  elif command -v apk >/dev/null 2>&1; then",
         "    apk update",
         "    apk add docker",
@@ -81,6 +101,62 @@ def _render_start_script(config: CloudInitConfig) -> str:
         "  else",
         "    curl -fsSL https://get.docker.com | sh",
         "  fi",
+        "}",
+        "",
+        "install_nvidia_drivers() {",
+        "  if [ \"$REQUIRES_GPU\" != \"true\" ]; then",
+        "    return",
+        "  fi",
+        "  # Check if drivers already working",
+        "  if nvidia-smi >/dev/null 2>&1; then",
+        "    echo \"✓ NVIDIA drivers already installed\"",
+        "    nvidia-smi --query-gpu=name,driver_version --format=csv,noheader || true",
+        "    return",
+        "  fi",
+        "  # Check if NVIDIA GPU exists",
+        "  if ! lspci | grep -i nvidia >/dev/null 2>&1; then",
+        "    echo \"Warning: No NVIDIA GPU detected\" >&2",
+        "    return",
+        "  fi",
+        "  # Install drivers",
+        "  echo \"Installing NVIDIA drivers...\"",
+        "  export DEBIAN_FRONTEND=noninteractive",
+        "  apt-get update -qq",
+        "  if apt-get install -y -qq nvidia-driver-535 nvidia-utils-535; then",
+        "    echo \"✓ NVIDIA drivers installed\"",
+        "  else",
+        "    apt-get install -y -qq ubuntu-drivers-common",
+        "    ubuntu-drivers autoinstall >/dev/null 2>&1 || true",
+        "  fi",
+        "  # Verify and restart Docker if drivers work",
+        "  if nvidia-smi >/dev/null 2>&1; then",
+        "    echo \"✓ NVIDIA drivers working\"",
+        "    nvidia-smi --query-gpu=name,driver_version --format=csv,noheader || true",
+        "    systemctl restart docker",
+        "    sleep 2",
+        "  else",
+        "    echo \"⚠️  GPU may require reboot to initialize\"",
+        "  fi",
+        "}",
+        "",
+        "install_nvidia_container_toolkit() {",
+        "  if [ \"$REQUIRES_GPU\" != \"true\" ]; then",
+        "    return",
+        "  fi",
+        "  if command -v nvidia-ctk >/dev/null 2>&1; then",
+        "    return",
+        "  fi",
+        "  echo \"Installing NVIDIA Container Toolkit...\"",
+        "  curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg",
+        "  curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \\",
+        "    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \\",
+        "    tee /etc/apt/sources.list.d/nvidia-container-toolkit.list",
+        "  apt-get update -qq",
+        "  apt-get install -y -qq nvidia-container-toolkit",
+        "  nvidia-ctk runtime configure --runtime=docker",
+        "  systemctl restart docker",
+        "  sleep 2",
+        "  echo \"✓ NVIDIA Container Toolkit installed\"",
         "}",
         "",
         "start_docker() {",
@@ -99,6 +175,8 @@ def _render_start_script(config: CloudInitConfig) -> str:
         "",
         "install_docker",
         "start_docker",
+        "install_nvidia_container_toolkit",
+        "install_nvidia_drivers",
         "",
         "i=0",
         "while [ $i -lt 30 ]; do",
@@ -115,12 +193,21 @@ def _render_start_script(config: CloudInitConfig) -> str:
         "",
         "docker pull \"$IMAGE\"",
         "docker rm -f \"$CONTAINER_NAME\" >/dev/null 2>&1 || true",
+    ]
+    
+    # Build docker run command with GPU support if needed
+    docker_run_lines = [
         "docker run -d \\",
         "  --name \"$CONTAINER_NAME\" \\",
         "  --restart unless-stopped \\",
         "  --env-file /etc/build-ai.env \\",
         "  -p ${EXTERNAL_PORT}:${INTERNAL_PORT} \\",
     ]
+    
+    if config.requires_gpu:
+        docker_run_lines.append("  --gpus all \\")
+    
+    lines.extend(docker_run_lines)
     image_line = "  \"$IMAGE\""
     if config.command:
         lines.append(image_line + " \\")

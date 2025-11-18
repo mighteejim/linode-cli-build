@@ -4,32 +4,36 @@ version: 0.1.0
 
 description: >
   Production-style text-generation inference API powered by vLLM. Exposes a
-  REST endpoint compatible with OpenAI-style completions.
+  REST endpoint compatible with OpenAI-style completions. Requires GPU instance.
 
 deploy:
   target: linode
   linode:
-    image: linode/ubuntu24.04
+    image: linode/ubuntu22.04
     region_default: us-mia
     type_default: g6-standard-8
     tags:
       - ai
       - llm
       - vllm
+      - gpu
     container:
       image: vllm/vllm-openai:latest
       internal_port: 8000
       external_port: 80
+      requires_gpu: true
+      command: --model ${MODEL_NAME:-meta-llama/Meta-Llama-3-8B-Instruct} --max-model-len 16384
       env:
         MODEL_NAME: meta-llama/Meta-Llama-3-8B-Instruct
+        HUGGING_FACE_HUB_TOKEN: ${HF_TOKEN}
       health:
         type: http
         path: /health
         port: 8000
         success_codes: [200]
-        initial_delay_seconds: 20
-        timeout_seconds: 3
-        max_retries: 30
+        initial_delay_seconds: 180
+        timeout_seconds: 10
+        max_retries: 60
 
 env:
   required:
@@ -37,7 +41,7 @@ env:
       description: Hugging Face token to download gated models.
   optional:
     - name: VLLM_GPU_MEMORY_UTILIZATION
-      description: Override GPU memory utilization fraction.
+      description: Override GPU memory utilization fraction (default 0.9).
 
 guidance:
   summary: |
@@ -47,6 +51,9 @@ guidance:
       command: curl http://{host}/health
     - description: List models (OpenAI-compatible)
       command: |
-        curl -X POST http://{host}/v1/models \
+        curl http://{host}/v1/models
+    - description: Generate text
+      command: |
+        curl -X POST http://{host}/v1/completions \
           -H 'Content-Type: application/json' \
-          -d '{}'
+          -d '{"model":"meta-llama/Meta-Llama-3-8B-Instruct","prompt":"Once upon a time","max_tokens":50}'

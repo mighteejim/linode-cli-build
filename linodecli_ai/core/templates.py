@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
-from .registry import TemplateRegistryClient, RegistryConfig
+from .template_registry import TemplateRegistryClient, RegistryConfig
 
 
 class TemplateError(RuntimeError):

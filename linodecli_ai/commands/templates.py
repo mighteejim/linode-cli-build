@@ -8,7 +8,7 @@ import textwrap
 from typing import Sequence
 
 from ..core import templates as template_core
-from ..core.registry import TemplateRegistryClient, RegistryConfig, RegistryNetworkError
+from ..core.template_registry import TemplateRegistryClient, RegistryConfig, RegistryNetworkError
 
 
 def register(subparsers: argparse._SubParsersAction, _config) -> None:
