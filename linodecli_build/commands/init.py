@@ -347,7 +347,7 @@ def _select_instance_type(types, default: str) -> str:
         print()
         print("GPU Instances (for AI/ML workloads):")
         print("-" * 80)
-        for t in gpu_types[:10]:  # Limit to top 10
+        for t in gpu_types:  # Show all GPU types
             type_id = t.get('id', 'unknown')
             default_marker = " (default)" if type_id == default else ""
             idx = len(all_types) + 1
@@ -356,15 +356,15 @@ def _select_instance_type(types, default: str) -> str:
             memory = t.get('memory', 0)
             vcpus = t.get('vcpus', 0)
             disk = t.get('disk', 0)
-            print(f"{idx:3}. {type_id:20} ${price:6.2f}/hr  "
-                  f"{memory:5}MB RAM  {vcpus:2} vCPUs  {disk:6}MB{default_marker}")
+            print(f"{idx:3}. {type_id:30} ${price:6.2f}/hr  "
+                  f"{memory:6}MB RAM  {vcpus:2} vCPUs  {disk:8}MB{default_marker}")
     
     # Show standard types
     if standard_types:
         print()
         print("Standard Instances:")
         print("-" * 80)
-        for t in standard_types[:15]:  # Limit to top 15
+        for t in standard_types[:25]:  # Show top 25 standard types
             type_id = t.get('id', 'unknown')
             default_marker = " (default)" if type_id == default else ""
             idx = len(all_types) + 1
@@ -373,8 +373,8 @@ def _select_instance_type(types, default: str) -> str:
             memory = t.get('memory', 0)
             vcpus = t.get('vcpus', 0)
             disk = t.get('disk', 0)
-            print(f"{idx:3}. {type_id:20} ${price:6.2f}/hr  "
-                  f"{memory:5}MB RAM  {vcpus:2} vCPUs  {disk:6}MB{default_marker}")
+            print(f"{idx:3}. {type_id:30} ${price:6.2f}/hr  "
+                  f"{memory:6}MB RAM  {vcpus:2} vCPUs  {disk:8}MB{default_marker}")
     
     print("=" * 80)
     
