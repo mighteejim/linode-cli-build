@@ -61,10 +61,19 @@ class DockerCapability(Capability):
         return "docker"
     
     def get_fragments(self) -> CapabilityFragments:
-        # Docker installation and startup is handled by the start script
-        # We just need to configure daemon.json if optimization is requested
         fragments = CapabilityFragments()
         
+        # Install Docker using official convenience script
+        fragments.runcmd.extend([
+            # Install Docker
+            "curl -fsSL https://get.docker.com -o get-docker.sh",
+            "sh get-docker.sh",
+            "rm get-docker.sh",
+            "systemctl enable docker",
+            "systemctl start docker",
+        ])
+        
+        # Configure daemon.json if optimization is requested
         if self.optimize:
             fragments.write_files.append({
                 "path": "/etc/docker/daemon.json",
@@ -72,6 +81,8 @@ class DockerCapability(Capability):
                 "owner": "root:root",
                 "content": '{"max-concurrent-downloads": 10}\n',
             })
+            # Restart Docker to apply config
+            fragments.runcmd.append("systemctl restart docker")
         
         return fragments
 
@@ -95,8 +106,20 @@ class GPUNvidiaCapability(Capability):
             "update-initramfs -u || true",
         ])
         
-        # The actual driver and toolkit installation is handled by the start script
-        # This keeps the logic centralized and allows for runtime detection
+        # Install NVIDIA drivers and container toolkit
+        fragments.runcmd.extend([
+            # Install NVIDIA drivers
+            "ubuntu-drivers devices || true",
+            "ubuntu-drivers autoinstall || true",
+            "",
+            # Install NVIDIA Container Toolkit
+            "curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg",
+            "curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | tee /etc/apt/sources.list.d/nvidia-container-toolkit.list",
+            "apt-get update -qq",
+            "apt-get install -y nvidia-container-toolkit",
+            "nvidia-ctk runtime configure --runtime=docker",
+            "systemctl restart docker || true",
+        ])
         
         return fragments
 
