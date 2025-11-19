@@ -1,6 +1,6 @@
 name: embeddings-python
 display_name: Embeddings (Python)
-version: 0.2.0
+version: 0.2.1
 
 description: >
   Sentence-transformers embedding service using Python. Drop-in replacement for TEI
@@ -72,16 +72,24 @@ setup:
     - path: /app/requirements.txt
       permissions: "0644"
       content: |
-        sentence-transformers
-        fastapi
-        uvicorn[standard]
+        # Pin versions for faster/reliable installs
+        sentence-transformers==3.3.1
+        fastapi==0.115.6
+        uvicorn[standard]==0.32.1
     
     - path: /app/start.sh
       permissions: "0755"
       content: |
         #!/bin/bash
         set -e
-        pip install -q -r /app/requirements.txt
+        echo "=========================================="
+        echo "Installing dependencies..."
+        echo "=========================================="
+        pip install --no-cache-dir -r /app/requirements.txt
+        echo ""
+        echo "=========================================="
+        echo "Starting application..."
+        echo "=========================================="
         python /app/main.py
 
 env:
