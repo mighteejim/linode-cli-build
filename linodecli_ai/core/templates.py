@@ -39,7 +39,12 @@ class Template:
     data: Dict[str, Any]
 
     def manifest_defaults(self) -> Dict[str, Any]:
-        """Return defaults used when writing ai.linode.yml."""
+        """Return defaults used when writing deploy.yml.
+        
+        NOTE: This method is deprecated and no longer used by init.py.
+        The init command now writes the complete template data directly to deploy.yml.
+        Kept for backward compatibility only.
+        """
         deploy = self.data.get("deploy", {})
         linode = deploy.get("linode", {})
         return {

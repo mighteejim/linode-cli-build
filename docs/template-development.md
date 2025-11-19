@@ -1,538 +1,719 @@
 # Template Development Guide
 
-This guide explains how to create custom templates for the Linode CLI AI plugin.
+This guide covers everything you need to know about creating, testing, and publishing templates for linode-cli-ai.
+
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Quick Start](#quick-start)
+3. [Template Structure](#template-structure)
+4. [Capabilities System](#capabilities-system)
+5. [Custom Setup Scripts](#custom-setup-scripts)
+6. [Best Practices](#best-practices)
+7. [LLM-Assisted Development](#llm-assisted-development)
+8. [Validation and Testing](#validation-and-testing)
+9. [Publishing Templates](#publishing-templates)
 
 ## Overview
 
-Templates are YAML configuration files that define how to deploy AI/ML workloads on Linode. Each template specifies:
+Templates define how to deploy AI services to Linode cloud instances. They specify:
 
-- Infrastructure requirements (instance type, region, OS image)
-- Container configuration (Docker image, ports, environment)
-- Health checks
-- Environment variables
-- Usage guidance
+- **What to deploy**: Container images, ports, environment variables
+- **Where to deploy**: Default region, instance type, base OS image
+- **How to set up**: System requirements using capabilities or custom scripts
+- **How to use**: Documentation, examples, and guidance
 
-## Template Structure
-
-A template consists of two required files:
-
-```
-template-name/
-├── template.yml          # Template specification
-└── docs/
-    └── README.md         # Usage documentation
-```
-
-## Template Specification Format
-
-### Basic Structure
-
-```yaml
-name: my-template
-display_name: My AI Template
-version: 0.1.0
-
-description: >
-  Brief description of what this template does and what AI/ML
-  workload it's designed for.
-
-deploy:
-  target: linode
-  linode:
-    # OS image to use
-    image: linode/ubuntu24.04
-    
-    # Default region (users can override)
-    region_default: us-southeast
-    
-    # Default instance type (users can override)
-    type_default: g6-standard-4
-    
-    # Tags for organization
-    tags:
-      - ai
-      - your-category
-    
-    # Container configuration
-    container:
-      # Docker image to run
-      image: your/docker:image
-      
-      # Port mapping (external -> internal)
-      internal_port: 8000
-      external_port: 80
-      
-      # Optional: Override container command
-      command: >
-        python server.py
-      
-      # Optional: Environment variables passed to container
-      env:
-        MODEL_NAME: default-model
-      
-      # Optional: Script to run after container starts
-      post_start_script: |
-        #!/bin/bash
-        docker exec app initialization-command
-      
-      # Health check (required)
-      health:
-        type: http  # or tcp
-        path: /health
-        port: 8000
-        success_codes: [200]
-        initial_delay_seconds: 30
-        timeout_seconds: 5
-        max_retries: 30
-
-# Environment variable requirements
-env:
-  required:
-    - name: API_KEY
-      description: API key for authentication
-  
-  optional:
-    - name: MODEL_NAME
-      description: Override default model
-
-# Usage guidance (shown after deployment)
-guidance:
-  summary: |
-    Brief explanation of how to use the deployed service.
-  
-  examples:
-    - description: Example API call
-      command: curl http://{host}/endpoint
-```
-
-### Field Descriptions
-
-#### Top-Level Fields
-
-- **name** (required): Unique template identifier (lowercase with hyphens)
-- **display_name** (required): Human-readable name
-- **version** (required): Semantic version (e.g., 0.1.0)
-- **description** (required): Detailed description of the template
-
-#### Deploy Configuration
-
-- **target**: Always `linode` for now
-- **linode.image**: Base OS image (use `linode/ubuntu24.04` for best Docker support)
-- **linode.region_default**: Default region code (e.g., `us-southeast`, `us-chi`)
-- **linode.type_default**: Default Linode plan (e.g., `g6-standard-4`, `g6-dedicated-8`)
-- **linode.tags**: List of tags for organization
-
-#### Container Configuration
-
-- **image** (required): Docker image (e.g., `ollama/ollama:latest`)
-- **internal_port** (required): Port the container listens on
-- **external_port** (required): Port exposed on the Linode (usually 80 or 443)
-- **command** (optional): Override container entrypoint
-- **env** (optional): Environment variables passed to container
-- **post_start_script** (optional): Bash script executed after container is running
-
-#### Health Check
-
-Health checks ensure the service is running before marking deployment as complete.
-
-**HTTP Health Check:**
-```yaml
-health:
-  type: http
-  path: /health
-  port: 8000
-  success_codes: [200]
-  initial_delay_seconds: 30
-  timeout_seconds: 5
-  max_retries: 30
-```
-
-**TCP Health Check:**
-```yaml
-health:
-  type: tcp
-  port: 8000
-  initial_delay_seconds: 10
-  timeout_seconds: 2
-  max_retries: 20
-```
-
-- **initial_delay_seconds**: Wait time before first health check
-- **timeout_seconds**: Timeout for each check
-- **max_retries**: Maximum attempts before failing
-
-#### Environment Variables
-
-```yaml
-env:
-  required:
-    - name: VAR_NAME
-      description: What this variable is for
-  
-  optional:
-    - name: OPTIONAL_VAR
-      description: Optional configuration
-```
-
-Required variables must be set by users. Optional variables have defaults or are truly optional.
-
-#### Guidance
-
-```yaml
-guidance:
-  summary: |
-    Explanation of how to use the service after deployment.
-    Include API endpoints, authentication, common operations.
-  
-  examples:
-    - description: Health check
-      command: curl http://{host}/health
-    
-    - description: API request
-      command: |
-        curl -X POST http://{host}/api \
-          -H 'Content-Type: application/json' \
-          -d '{"input":"test"}'
-```
-
-The `{host}` placeholder is replaced with the deployed Linode's IP or hostname.
-
-## Documentation
-
-### docs/README.md
-
-Every template must include comprehensive documentation:
-
-```markdown
-# Template Name
-
-## Overview
-
-What this template deploys and what it's used for.
-
-## What Gets Deployed
-
-- Linode instance type: g6-standard-4
-- Docker container: your/image:tag
-- Exposed port: 80
-- Default region: us-southeast
-
-## Prerequisites
-
-- Linode API token
-- Any required API keys (e.g., Hugging Face, OpenAI)
+Templates use a **declarative approach** with the capabilities system, making them easy to create and maintain without writing shell scripts.
 
 ## Quick Start
 
-\```bash
-# Set required environment variables
-export API_KEY=your_key
+### Option 1: LLM-Assisted (Recommended)
 
-# Initialize and deploy
-linode-cli ai init template-name
-linode-cli ai deploy
-\```
-
-## Configuration
-
-### Required Environment Variables
-
-- `API_KEY`: Description and where to obtain it
-
-### Optional Environment Variables
-
-- `MODEL_NAME`: Default is `model/name`
-
-## Usage Examples
-
-### Example 1: Basic Usage
-
-\```bash
-curl http://YOUR_LINODE_IP/endpoint
-\```
-
-### Example 2: With Authentication
-
-\```bash
-curl -H "Authorization: Bearer $API_KEY" \
-  http://YOUR_LINODE_IP/endpoint
-\```
-
-## Performance
-
-- Startup time: ~2 minutes
-- Memory usage: ~4GB
-- GPU utilization: 80-95% (if applicable)
-
-## Cost Estimates
-
-| Instance Type | Hourly | Monthly | Use Case |
-|--------------|--------|---------|----------|
-| g6-standard-2 | $0.XX | $XX.XX | Development |
-| g6-standard-4 | $0.XX | $XX.XX | Production |
-
-## Troubleshooting
-
-### Issue: Container fails to start
-
-Solution: Check logs with `linode-cli ai status`
-
-### Issue: Out of memory
-
-Solution: Upgrade to larger instance type
-
-## Resources
-
-- [Official Documentation](https://example.com)
-- [GitHub Repository](https://github.com/example/repo)
-```
-
-## Best Practices
-
-### Container Selection
-
-1. **Use official images** when possible
-2. **Pin versions** for reproducibility: `python:3.11-slim`
-3. **Optimize size**: Prefer `-slim` or `-alpine` variants
-
-### Health Checks
-
-1. **Always include** a health check
-2. **Set appropriate delays** for model loading (LLMs may need 60-120s)
-3. **Use realistic timeouts** (account for cold starts)
-
-### Environment Variables
-
-1. **Never hardcode secrets** in template.yml
-2. **Document where to obtain API keys**
-3. **Provide sensible defaults** for optional variables
-
-### Performance
-
-1. **Choose appropriate instance types** for the workload
-2. **Document GPU requirements** clearly
-3. **Include memory/storage estimates**
-
-### Security
-
-1. **No hardcoded credentials**
-2. **Use HTTPS** when possible (may require additional configuration)
-3. **Document security considerations**
-4. **Keep Docker images updated**
-
-## Testing Your Template
-
-### 1. Local Testing
-
-Test the Docker container locally:
+Use AI assistance to generate templates quickly:
 
 ```bash
-docker run -p 80:8000 your/image:tag
-curl http://localhost/health
+linode-cli ai templates scaffold my-api --llm-assist
+
+# Answer a few questions:
+# - What service? (e.g., "FastAPI ML inference API")
+# - Requires GPU? (y/n)
+# - Dependencies? (e.g., "PyTorch, Redis")
+# - Container image? (e.g., "pytorch/pytorch:latest")
+# - Health check? (e.g., "/health")
+# - Startup time? (e.g., "120" seconds)
+
+# This creates:
+# - my-api/template-stub.yml (basic structure)
+# - my-api/llm-instructions.md (comprehensive guide for LLM)
+# - my-api/docs/README-stub.md
+# - my-api/.env.example
+
+# Feed to your LLM (Cursor, Claude, GPT-4):
+# "@my-api/llm-instructions.md complete this template"
 ```
 
-### 2. Linode Testing
+### Option 2: Interactive (Traditional)
 
-Deploy and verify:
+Answer detailed questions to generate a complete template:
 
 ```bash
-# Create test project
-mkdir test-template
-cd test-template
+linode-cli ai templates scaffold my-api
 
-# Initialize with your template
-linode-cli ai init your-template
-
-# Deploy
-linode-cli ai deploy --wait
-
-# Verify health
-linode-cli ai status
-
-# Test the service
-curl http://$(linode-cli ai status --format json | jq -r '.ip')/health
-
-# Clean up
-linode-cli ai destroy
+# Answer detailed questions about:
+# - Display name, description
+# - Runtime (Docker, native)
+# - GPU requirements
+# - Container details
+# - Health checks
+# - Environment variables
 ```
 
-### 3. Validation
+### Option 3: Manual Creation
 
-Run validation scripts (from templates repository):
+Create from scratch following the [Template Structure](#template-structure).
 
-```bash
-cd /path/to/linode-cli-ai-templates
-python .github/workflows/validate_templates.py
-python .github/workflows/validate_index.py
+## Template Structure
+
+A template consists of:
+
+```
+my-template/
+├── template.yml          # Main template definition
+├── docs/
+│   └── README.md        # Documentation
+└── .env.example         # Example environment variables (optional)
 ```
 
-## Publishing Your Template
-
-### Option 1: Official Templates Repository
-
-1. Fork [linode-cli-ai-templates](https://github.com/linode/linode-cli-ai-templates)
-2. Create your template in `templates/your-template/`
-3. Add entry to `index.yml`
-4. Submit pull request
-
-See [CONTRIBUTING.md](https://github.com/linode/linode-cli-ai-templates/blob/main/CONTRIBUTING.md) for details.
-
-### Option 2: Private Repository
-
-You can host templates in your own repository:
-
-1. Create repository with same structure
-2. Create your own `index.yml`
-3. Host on GitHub or any accessible URL
-4. Users add your registry:
-
-```bash
-# Add custom template source
-cat >> ~/.config/linode-cli.d/ai/config.yml << EOF
-templates:
-  sources:
-    - name: my-company
-      url: https://raw.githubusercontent.com/my-company/templates/main/index.yml
-      enabled: true
-EOF
-
-# Update templates
-linode-cli ai templates update
-```
-
-## Template Categories
-
-Choose appropriate tags for your template:
-
-- **LLM**: `llm`, `text-generation`, `chat`, `completions`
-- **Embeddings**: `embeddings`, `vectors`, `semantic-search`
-- **Vision**: `vision`, `image-generation`, `object-detection`, `image-classification`
-- **Audio**: `audio`, `speech-to-text`, `text-to-speech`, `transcription`
-- **Multimodal**: `multimodal`, `vision-language`
-- **Fine-tuning**: `fine-tuning`, `training`
-- **Agents**: `agents`, `autonomous`, `tools`
-- **Infrastructure**: `api`, `inference`, `serving`
-
-## Examples
-
-### Example 1: Simple LLM API
+### Minimal template.yml
 
 ```yaml
-name: simple-llm
-display_name: Simple LLM API
+name: my-template
+display_name: My Template
 version: 0.1.0
 
-description: >
-  Basic text generation API using a small language model.
+description: |
+  What this template does and what it's used for.
+
+capabilities:
+  runtime: docker
+  features:
+    - gpu-nvidia  # If GPU needed
 
 deploy:
   target: linode
   linode:
-    image: linode/ubuntu24.04
-    region_default: us-southeast
-    type_default: g6-standard-4
+    image: linode/ubuntu22.04
+    region_default: us-mia
+    type_default: g6-standard-8
     tags:
       - ai
-      - llm
-      - api
+    
     container:
-      image: vllm/vllm-openai:latest
+      image: myorg/myapp:latest
       internal_port: 8000
       external_port: 80
-      env:
-        MODEL_NAME: TinyLlama/TinyLlama-1.1B-Chat-v1.0
+      
       health:
         type: http
         path: /health
         port: 8000
         success_codes: [200]
         initial_delay_seconds: 60
-        timeout_seconds: 5
-        max_retries: 20
-
-env:
-  required: []
-  optional:
-    - name: HF_TOKEN
-      description: Hugging Face token for gated models
-
-guidance:
-  summary: |
-    OpenAI-compatible text generation API.
-  examples:
-    - description: List models
-      command: curl http://{host}/v1/models
-    - description: Generate text
-      command: |
-        curl -X POST http://{host}/v1/completions \
-          -H 'Content-Type: application/json' \
-          -d '{"model":"TinyLlama/TinyLlama-1.1B-Chat-v1.0","prompt":"Hello"}'
-```
-
-### Example 2: GPU-Accelerated Service
-
-```yaml
-name: stable-diffusion
-display_name: Stable Diffusion XL
-version: 0.1.0
-
-description: >
-  Stable Diffusion XL image generation API with GPU acceleration.
-
-deploy:
-  target: linode
-  linode:
-    image: linode/ubuntu24.04
-    region_default: us-southeast
-    type_default: g6-dedicated-8  # GPU instance
-    tags:
-      - ai
-      - vision
-      - image-generation
-      - gpu
-    container:
-      image: stabilityai/stable-diffusion:latest
-      internal_port: 8000
-      external_port: 80
-      command: >
-        python -m serve --model sdxl-1.0
-      health:
-        type: http
-        path: /health
-        port: 8000
-        success_codes: [200]
-        initial_delay_seconds: 120  # Model loading takes time
         timeout_seconds: 10
         max_retries: 30
 
 env:
-  required:
-    - name: HF_TOKEN
-      description: Hugging Face token to download SDXL model
+  required: []
   optional: []
 
 guidance:
   summary: |
-    Text-to-image generation API. POST to /generate with a prompt.
+    How to use this service after deployment.
   examples:
-    - description: Generate image
-      command: |
-        curl -X POST http://{host}/generate \
-          -H 'Content-Type: application/json' \
-          -d '{"prompt":"A serene mountain landscape"}' \
-          --output image.png
+    - description: Check health
+      command: curl http://{host}/health
 ```
+
+## Capabilities System
+
+The capabilities system lets you declare requirements without writing setup scripts.
+
+### Runtime
+
+Specify the runtime environment:
+
+```yaml
+capabilities:
+  runtime: docker  # or 'native', 'k3s'
+```
+
+- **docker**: Installs Docker and runs containerized services (most common)
+- **native**: No container, for native binaries or scripts
+- **k3s**: Lightweight Kubernetes (advanced)
+
+### Features
+
+Declare common features your service needs:
+
+```yaml
+capabilities:
+  features:
+    - gpu-nvidia          # NVIDIA GPU drivers + container toolkit
+    - docker-optimize     # Enable 10 concurrent downloads
+    - python-3.11         # Python 3.11 runtime
+    - nodejs-18           # Node.js 18 runtime
+    - redis               # Redis server
+    - postgresql-14       # PostgreSQL 14 server
+```
+
+Available features:
+
+| Feature | Description |
+|---------|-------------|
+| `gpu-nvidia` | NVIDIA drivers (535) + Container Toolkit |
+| `docker-optimize` | Parallel Docker layer downloads (10 concurrent) |
+| `python-3.10` | Python 3.10 runtime |
+| `python-3.11` | Python 3.11 runtime |
+| `python-3.12` | Python 3.12 runtime |
+| `nodejs-18` | Node.js 18 runtime |
+| `nodejs-20` | Node.js 20 runtime |
+| `redis` | Redis server (auto-started) |
+| `postgresql-14` | PostgreSQL 14 server |
+| `postgresql-15` | PostgreSQL 15 server |
+
+### Custom Packages
+
+Install additional system packages:
+
+```yaml
+capabilities:
+  packages:
+    - libcurl4
+    - build-essential
+    - ffmpeg
+```
+
+### Complete Example
+
+```yaml
+capabilities:
+  runtime: docker
+  features:
+    - gpu-nvidia
+    - docker-optimize
+    - redis
+  packages:
+    - libopencv-dev
+```
+
+This installs:
+- Docker runtime
+- NVIDIA GPU support
+- Redis server
+- Custom packages
+
+## Custom Setup Scripts
+
+For complex scenarios not covered by capabilities, use custom setup scripts:
+
+```yaml
+setup:
+  script: |
+    #!/bin/bash
+    set -e
+    
+    # Custom installation
+    curl -L https://example.com/installer.sh | bash
+    
+    # Configuration
+    echo "custom_setting=true" > /etc/myapp/config
+  
+  files:
+    - path: /etc/myapp/config.yml
+      permissions: "0644"
+      owner: "root:root"
+      content: |
+        setting: value
+        database_url: ${DATABASE_URL}
+```
+
+**Note**: Prefer capabilities over custom scripts when possible. Custom scripts are harder to maintain and test.
+
+## Best Practices
+
+### 1. GPU Templates
+
+**Do:**
+- Use `capabilities.features: [gpu-nvidia]` instead of `requires_gpu: true`
+- Use `linode/ubuntu22.04` base image (proven stable for GPU)
+- Set generous health check timeouts (3+ minutes for model loading)
+- Enable Docker optimization: `features: [gpu-nvidia, docker-optimize]`
+
+**Example:**
+
+```yaml
+capabilities:
+  runtime: docker
+  features:
+    - gpu-nvidia
+    - docker-optimize
+
+deploy:
+  linode:
+    image: linode/ubuntu22.04
+    type_default: g6-standard-8
+    container:
+      health:
+        initial_delay_seconds: 180
+        max_retries: 60
+```
+
+### 2. Environment Variables
+
+**Clear descriptions with examples:**
+
+```yaml
+env:
+  required:
+    - name: API_KEY
+      description: Your service API key (get from dashboard)
+  
+  optional:
+    - name: MODEL_NAME
+      description: |
+        HuggingFace model to load. Popular options:
+        - microsoft/Phi-3-mini-4k-instruct (4k context)
+        - mistralai/Mistral-7B-Instruct-v0.3 (32k context)
+        - meta-llama/Meta-Llama-3-8B-Instruct (8k context, gated)
+        Default: meta-llama/Meta-Llama-3-8B-Instruct
+```
+
+**Variable expansion in container config:**
+
+```yaml
+container:
+  command: --model ${MODEL_NAME:-default-model}
+  env:
+    DATABASE_URL: ${DB_URL}
+```
+
+### 3. Health Checks
+
+**Always include health checks:**
+
+```yaml
+health:
+  type: http
+  path: /health
+  port: 8000
+  success_codes: [200]
+  initial_delay_seconds: 60  # Adjust for your service
+  timeout_seconds: 10
+  max_retries: 30  # 5 minutes total
+```
+
+**Timing guidelines:**
+- Simple services: `initial_delay_seconds: 10-30`
+- Model loading: `initial_delay_seconds: 60-180`
+- Large models: `initial_delay_seconds: 180-300`
+
+### 4. Documentation
+
+**Include helpful guidance:**
+
+```yaml
+guidance:
+  summary: |
+    This template deploys a FastAPI ML inference service.
+    
+    The API is exposed on port 80. Use {host} in examples below
+    to refer to your Linode's hostname.
+    
+    Model loading takes 2-3 minutes on first start.
+  
+  examples:
+    - description: Check service health
+      command: curl http://{host}/health
+    
+    - description: Run inference
+      command: |
+        curl -X POST http://{host}/predict \
+          -H 'Content-Type: application/json' \
+          -d '{"input": "your data here"}'
+```
+
+### 5. Instance Sizing
+
+**Choose appropriate defaults:**
+
+| Workload | Instance Type | GPU | RAM | Use Case |
+|----------|---------------|-----|-----|----------|
+| Small models (< 7B) | `g6-standard-4` | 1x RTX 6000 Ada | 16GB | Development, small models |
+| Medium models (7-13B) | `g6-standard-8` | 1x RTX 6000 Ada | 32GB | Production, medium models |
+| Large models (13-30B) | `g6-dedicated-16` | 1x RTX 6000 Ada | 64GB | Large models |
+| CPU workloads | `g6-standard-2` | None | 8GB | Utilities, embeddings |
+
+### 6. Base Images
+
+**GPU workloads:**
+- Use: `linode/ubuntu22.04` (proven stability)
+- Avoid: Debian, Alpine (driver issues)
+
+**CPU workloads:**
+- Use: `linode/ubuntu24.04` (latest LTS)
+- Alternative: `linode/debian12`
+
+### 7. Version Management
+
+**Semantic versioning:**
+```yaml
+version: 0.1.0  # MAJOR.MINOR.PATCH
+```
+
+- **MAJOR**: Breaking changes
+- **MINOR**: New features (backward compatible)
+- **PATCH**: Bug fixes
+
+### 8. Tags
+
+**Use descriptive tags:**
+
+```yaml
+tags:
+  - ai
+  - llm  # or embeddings, vision, etc.
+  - gpu  # if GPU required
+  - production  # or development, experimental
+```
+
+## LLM-Assisted Development
+
+The LLM-assisted workflow leverages AI to help you create production-ready templates quickly.
+
+### How It Works
+
+1. **Run scaffold with `--llm-assist`:**
+   ```bash
+   linode-cli ai templates scaffold pytorch-serve --llm-assist
+   ```
+
+2. **Answer high-level questions:**
+   - Service description
+   - GPU requirements
+   - Dependencies
+   - Container image
+   - Health check details
+
+3. **Get comprehensive context:**
+   - `template-stub.yml`: Basic structure with your inputs
+   - `llm-instructions.md`: Complete guide for LLM with:
+     - Template system documentation
+     - Capability reference
+     - Example templates
+     - Schema reference
+     - Best practices
+     - Validation checklist
+
+4. **Feed to your LLM:**
+   ```
+   In Cursor/Claude/GPT-4:
+   "@llm-instructions.md complete this template for PyTorch model serving"
+   ```
+
+5. **LLM generates:**
+   - Complete `template.yml`
+   - Appropriate capabilities
+   - Health checks with correct timing
+   - Environment variable documentation
+   - Usage examples
+
+6. **Validate and test:**
+   ```bash
+   linode-cli ai templates validate pytorch-serve
+   linode-cli ai templates test pytorch-serve --dry-run
+   ```
+
+### Benefits
+
+- **Fast**: Create complex templates in minutes
+- **Best practices**: LLM applies proven patterns automatically
+- **Comprehensive**: All sections filled out with helpful docs
+- **Learning tool**: Study generated templates to understand the system
+
+### Example Workflow
+
+```bash
+# 1. Create scaffold
+$ linode-cli ai templates scaffold ml-api --llm-assist
+
+What service do you want to deploy?
+> PyTorch model serving with FastAPI and Redis caching
+
+Does it require GPU? [y/n]: y
+
+Any special dependencies?
+> PyTorch 2.0, Redis for caching, Prometheus metrics
+
+Container image:
+> pytorch/pytorch:2.0-cuda12.0-runtime
+
+Health check endpoint:
+> /health
+
+Expected startup time in seconds:
+> 120
+
+✓ Created ml-api/ directory
+✓ Created llm-instructions.md
+✓ Created template-stub.yml
+
+# 2. In Cursor
+$ cursor ml-api/
+
+# Then in Cursor:
+> @llm-instructions.md Complete this template with support for:
+> - Multiple model formats (PyTorch, ONNX)
+> - Redis caching with TTL
+> - Batch inference
+> - Prometheus metrics at /metrics
+> - Graceful shutdown
+
+# LLM generates complete template.yml
+
+# 3. Validate
+$ linode-cli ai templates validate ml-api
+✓ All required fields present
+✓ Schema validation passed
+✓ Template validation successful!
+
+# 4. Test
+$ linode-cli ai templates test ml-api --dry-run
+# Shows generated cloud-init
+
+# 5. Deploy
+$ linode-cli ai init ml-api
+$ cd ml-api
+$ cp .env.example .env
+# Edit .env
+$ linode-cli ai deploy --wait
+```
+
+## Validation and Testing
+
+### Validate Template
+
+Check template correctness before deploying:
+
+```bash
+linode-cli ai templates validate my-template/
+
+# Or validate specific file
+linode-cli ai templates validate my-template/template.yml
+```
+
+**Checks:**
+- Required fields present
+- Correct data types
+- Valid capabilities
+- Health check configuration
+- GPU configuration (image, instance type)
+- Semantic versioning
+
+### Test Template (Dry Run)
+
+See generated cloud-init without deploying:
+
+```bash
+linode-cli ai templates test my-template --dry-run
+```
+
+**Shows:**
+- Complete cloud-init configuration
+- What will be installed
+- What will be configured
+- Summary of settings
+
+### Test Template (Live Deploy)
+
+**Note**: Live deployment testing coming soon. For now:
+
+```bash
+# Manual test deployment
+linode-cli ai init my-template --directory my-deployment
+cd my-deployment
+# Review and customize deploy.yml if needed
+nano deploy.yml
+cp .env.example .env
+# Configure .env
+linode-cli ai deploy --wait
+linode-cli ai status
+
+# Clean up
+linode-cli ai destroy  # Reads app name from deploy.yml
+```
+
+## Publishing Templates
+
+### Local Development
+
+Test locally before publishing:
+
+```bash
+# Put template in local directory
+mkdir -p my-templates/my-api
+cp template.yml my-templates/my-api/
+
+# Use local template
+linode-cli ai init ./my-templates/my-api
+```
+
+### Bundled Templates
+
+To include in linode-cli-ai:
+
+1. Create template in `linodecli_ai/templates/`
+2. Add to `linodecli_ai/templates/index.yml`:
+   ```yaml
+   templates:
+     - name: my-template
+       path: templates/my-template/template.yml
+   ```
+3. Submit pull request
+
+### Remote Registry
+
+Publish to community registry (coming soon):
+
+```bash
+linode-cli ai templates publish my-template \
+  --registry https://registry.example.com
+```
+
+## Schema Reference
+
+### Complete Schema
+
+```yaml
+# Required fields
+name: string                    # Unique identifier (lowercase, hyphens)
+display_name: string            # Human-readable name
+version: string                 # Semantic version (X.Y.Z)
+description: string             # Multi-line description
+
+# Optional capabilities
+capabilities:
+  runtime: docker | native | k3s
+  features:
+    - gpu-nvidia
+    - docker-optimize
+    # ... other features
+  packages:
+    - libcurl4
+    # ... other packages
+
+# Required deployment config
+deploy:
+  target: linode
+  linode:
+    image: string               # Base OS image
+    region_default: string      # Default region
+    type_default: string        # Default instance type
+    tags: [string]              # Organization tags
+    
+    container:                  # For Docker runtime
+      image: string             # Docker image
+      internal_port: integer    # Container port
+      external_port: integer    # Host port
+      command: string           # Optional CMD override
+      env: object               # Default env vars
+      
+      health:                   # Health check (recommended)
+        type: http | tcp | exec
+        path: string            # For HTTP
+        port: integer
+        success_codes: [integer]
+        initial_delay_seconds: integer
+        timeout_seconds: integer
+        max_retries: integer
+      
+      post_start_script: string # Script after container starts
+
+# Optional custom setup
+setup:
+  script: string                # Custom setup script
+  files:
+    - path: string
+      content: string
+      permissions: string
+      owner: string
+
+# Optional environment variables
+env:
+  required:
+    - name: string
+      description: string
+  optional:
+    - name: string
+      description: string
+
+# Optional usage guidance
+guidance:
+  summary: string               # Usage instructions
+  examples:
+    - description: string
+      command: string
+```
+
+## Troubleshooting
+
+### Template Won't Validate
+
+**Error: Missing required fields**
+- Ensure all required fields are present: name, display_name, version, description, deploy
+
+**Error: Invalid capability**
+- Check capability name spelling
+- See [Capabilities System](#capabilities-system) for valid features
+
+**Warning: Using deprecated requires_gpu**
+- Replace `requires_gpu: true` with `capabilities.features: [gpu-nvidia]`
+
+### Cloud-Init Generation Fails
+
+**Error: No capability manager**
+- Add `capabilities.runtime: docker` section
+
+**Error: Invalid runtime**
+- Runtime must be: `docker`, `native`, or `k3s`
+
+### Health Check Timing
+
+**Health check fails immediately**
+- Increase `initial_delay_seconds`
+- Check `path` is correct
+- Verify `port` matches internal_port
+
+**Health check times out**
+- Increase `max_retries`
+- Check service actually starts
+- Look at Linode console logs
+
+### GPU Issues
+
+**Error: GPU instance but wrong image**
+- Use `linode/ubuntu22.04` for GPU instances
+
+**Warning: GPU capability without GPU instance**
+- Instance type should start with `g6-`
+
+## Additional Resources
+
+- [Template Deployments Guide](template-deployments.md)
+- [Example Templates](../linodecli_ai/templates/)
+- [Linode API Documentation](https://www.linode.com/docs/api/)
 
 ## Getting Help
 
-- **Issues**: [GitHub Issues](https://github.com/linode/linode-cli-ai/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/linode/linode-cli-ai-templates/discussions)
-- **Documentation**: [Linode Docs](https://www.linode.com/docs/)
-
-## Resources
-
-- [Template Repository](https://github.com/linode/linode-cli-ai-templates)
-- [Contributing Guidelines](https://github.com/linode/linode-cli-ai-templates/blob/main/CONTRIBUTING.md)
-- [Existing Templates](https://github.com/linode/linode-cli-ai-templates/tree/main/templates)
-- [Docker Documentation](https://docs.docker.com/)
-- [Cloud-init Documentation](https://cloudinit.readthedocs.io/)
+- GitHub Issues: [linode-cli-ai/issues](https://github.com/linode/linode-cli-ai/issues)
+- Community Forum: [Linode Community](https://www.linode.com/community/)
+- Documentation: [Linode Docs](https://www.linode.com/docs/)

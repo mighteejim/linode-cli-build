@@ -1,127 +1,236 @@
-# linode-cli ai Plugin
+# 🚀 linode-cli ai Plugin
 
-Prototype plugin that extends `linode-cli` with an `ai` command namespace for deploying AI demo apps to Linode instances. Phase 1 focuses on single-Linode deployments driven by cloud-init and public container images.
+**Deploy AI services to Linode in minutes with simple, declarative templates.**
 
-## Installation
+A `linode-cli` plugin that makes deploying AI applications as easy as running a single command. Perfect for LLM APIs, chat agents, embeddings servers, and more.
+
+---
+
+## ✨ Features
+
+- 🎯 **Simple Workflow** - Init, customize, deploy. That's it.
+- 🤖 **AI-Ready Templates** - Pre-configured for GPU workloads, LLMs, embeddings, and more
+- 📦 **Template System** - Use bundled templates or create your own
+- 🔧 **Fully Customizable** - Override any setting per deployment
+- 🌐 **Multi-Environment** - Deploy prod, staging, dev from the same template
+- 🏥 **Health Checks** - Automatic health monitoring for your services
+- 📊 **Status Tracking** - See all deployments and their health at a glance
+
+---
+
+## 📦 Installation
 
 ```bash
 pip install linodecli-ai
 linode-cli register-plugin linodecli_ai
 ```
 
-This plugin relies on the existing `linode-cli` authentication and configuration.
+This plugin uses your existing `linode-cli` authentication and configuration.
 
-### Build From Source
-
-If you are working inside this repository and want to use the latest code:
+### 🛠️ Build From Source
 
 ```bash
-# 1. Clone the repo (if you haven't already)
+# Clone the repository
 git clone https://github.com/linode/linode-cli-ai.git
 cd linode-cli-ai
 
-# 2. Install dependencies in editable mode
+# Install in editable mode
 pip install -e .
 
-# 3. Register the plugin with linode-cli
+# Register the plugin
 linode-cli register-plugin linodecli_ai
 ```
 
-You can unregister with `linode-cli unregister-plugin ai` if you need to clean up.
+---
 
-## Commands Overview
+## 🚀 Quick Start
+
+Deploy an LLM API in under 2 minutes:
+
+```bash
+# 1. Initialize from template
+linode-cli ai init llm-api --directory my-llm
+cd my-llm
+
+# 2. Configure (optional)
+nano deploy.yml  # Customize region, instance type, etc.
+cp .env.example .env  # Set your environment variables
+
+# 3. Deploy!
+linode-cli ai deploy --wait
+
+# 4. Check status
+linode-cli ai status
+```
+
+That's it! Your LLM API is now running on Linode with GPU support.
+
+---
+
+## 📚 Commands Reference
+
+### Template Management
 
 | Command | Description |
-| --- | --- |
-| `linode-cli ai templates list` | List available AI templates (bundled and remote) |
-| `linode-cli ai templates show <name>` | Show full template metadata |
-| `linode-cli ai templates update` | Update templates from remote registry |
-| `linode-cli ai templates install <name>` | Download a specific template |
-| `linode-cli ai templates remove <name>` | Remove a cached template |
-| `linode-cli ai init <template>` | Scaffold a project directory (`ai.linode.yml`, `.env.example`, README) |
-| `linode-cli ai deploy` | Deploy the current project to a single Linode using cloud-init |
-| `linode-cli ai status` | Show deployment status/health from the registry and Linode API |
-| `linode-cli ai destroy` | Tear down deployments and clean the registry |
+|---------|-------------|
+| `linode-cli ai templates list` | 📋 List available templates |
+| `linode-cli ai templates show <name>` | 🔍 Show template details |
+| `linode-cli ai templates scaffold <name>` | ✏️ Create a new template |
+| `linode-cli ai templates validate <path>` | ✅ Validate template syntax |
+| `linode-cli ai templates test <name> --dry-run` | 🧪 Preview deployment config |
+| `linode-cli ai templates update` | 🔄 Update from remote registry |
 
-## Available Templates
+### Deployment Lifecycle
 
-The plugin includes 3 bundled templates and supports remote templates from the [linode-cli-ai-templates](https://github.com/linode/linode-cli-ai-templates) repository.
+| Command | Description |
+|---------|-------------|
+| `linode-cli ai init <template>` | 🎬 Initialize a new deployment |
+| `linode-cli ai deploy` | 🚀 Deploy to Linode |
+| `linode-cli ai status` | 📊 Check deployment status |
+| `linode-cli ai destroy` | 💣 Tear down deployment |
+
+---
+
+## 🎨 Available Templates
 
 ### Bundled Templates
 
-- **chat-agent**: Ollama-based chat agent (llama3)
-- **llm-api**: vLLM-based text generation API (OpenAI-compatible)
-- **embeddings-python**: Sentence-transformers embeddings server (all-mpnet-base-v2)
+| Template | Description | GPU |
+|----------|-------------|-----|
+| **chat-agent** | Ollama-based chat agent with Llama 3 | ✅ |
+| **llm-api** | vLLM text generation API (OpenAI-compatible) | ✅ |
+| **embeddings-python** | Sentence-transformers embeddings server | ❌ |
 
-### Remote Templates
+### 🌐 Community Templates
 
-Additional templates are available from the community template registry. The plugin automatically checks for and downloads templates from the remote registry as needed.
+Explore more templates in the [community registry](https://github.com/linode/linode-cli-ai-templates):
 
 ```bash
-# List all available templates (bundled + remote)
+# List all available templates
 linode-cli ai templates list
 
 # Update templates from registry
 linode-cli ai templates update
 
-# Install a specific template version
+# Use a specific version
 linode-cli ai init chat-agent@0.2.0
 ```
 
-### Template Versioning
+---
 
-Templates support semantic versioning. You can specify a version when initializing:
+## 💡 Example Workflows
 
-```bash
-# Use latest version (default)
-linode-cli ai init chat-agent
+### Deploy Multiple Environments
 
-# Use specific version
-linode-cli ai init chat-agent@0.1.0
-```
-
-## Typical Workflow
+Use the same template for different environments:
 
 ```bash
-# List available templates
-linode-cli ai templates list
+# Production
+linode-cli ai init llm-api --directory prod
+cd prod
+nano deploy.yml  # region: us-east, type: g6-dedicated-16
+linode-cli ai deploy --wait
 
-# Initialize a project from a template
-linode-cli ai init chat-agent --directory my-agent
-cd my-agent
+# Staging
+linode-cli ai init llm-api --directory staging
+cd staging
+nano deploy.yml  # region: us-west, type: g6-standard-8
+linode-cli ai deploy --wait
 
-# Configure environment (if needed)
-cp .env.example .env   # fill in required values if any
-
-# Deploy to Linode
-linode-cli ai deploy --region us-chi --linode-type g6-standard-2 --wait
-
-# Check deployment status
-linode-cli ai status
-
-# Destroy when done
-linode-cli ai destroy --app chat-agent --env default
+# Development
+linode-cli ai init llm-api --directory dev
+cd dev
+nano deploy.yml  # region: us-southeast, type: g6-standard-4
+linode-cli ai deploy --wait
 ```
 
-Deployments are tracked locally at `~/.config/linode-cli.d/ai/ai-deployments.json`, which allows the `status` and `destroy` commands to operate without additional inputs.
+### Create Your Own Template
 
-## Further Reading
+Use AI assistance to scaffold a new template:
 
-- `docs/template-deployments.md` – End-to-end overview of how manifests, env files, and deployments fit together.
-- `docs/template-development.md` – Guide for creating custom templates.
-- `linodecli_ai/templates/<template>/docs/README.md` – Template-specific notes (environment variables, ports, usage examples).
-- [Template Repository](https://github.com/linode/linode-cli-ai-templates) – Community templates and contribution guidelines.
+```bash
+# Create template with LLM assistance
+linode-cli ai templates scaffold my-api --llm-assist
 
-## Configuration
+# Answer a few questions, then feed to your LLM:
+# "@my-api/llm-instructions.md complete this template"
 
-The plugin stores configuration at `~/.config/linode-cli.d/ai/config.yml`. You can customize:
+# Validate and test
+linode-cli ai templates validate my-api
+linode-cli ai templates test my-api --dry-run
 
-- Template registry URL
-- Template cache directory
-- Auto-update behavior
-- Update check interval
+# Deploy
+linode-cli ai init my-api --directory test-deploy
+cd test-deploy
+linode-cli ai deploy --wait
+```
 
-Example configuration:
+---
+
+## 📖 How It Works
+
+### Template Authoring
+
+Templates are defined in `template.yml` files:
+
+```yaml
+name: my-api
+display_name: My API
+version: 1.0.0
+
+description: |
+  My awesome AI service
+
+capabilities:
+  runtime: docker
+  features:
+    - gpu-nvidia        # NVIDIA GPU support
+    - docker-optimize   # Fast image pulls
+
+deploy:
+  target: linode
+  linode:
+    image: linode/ubuntu22.04
+    region_default: us-mia
+    type_default: g6-standard-8
+    
+    container:
+      image: myorg/myapi:latest
+      internal_port: 8000
+      external_port: 80
+      
+      health:
+        type: http
+        path: /health
+        port: 8000
+```
+
+### Deployment Configuration
+
+When you run `init`, the template is copied to `deploy.yml` in your deployment directory. You can then customize it for each deployment:
+
+```
+my-deployment/
+├── deploy.yml        # Complete deployment config (customize this!)
+├── .env              # Your secrets
+├── .env.example      # Template
+└── README.md         # Usage instructions
+```
+
+### Single Source of Truth
+
+Everything you need is in `deploy.yml`:
+- **What to deploy**: Container image, ports, capabilities
+- **Where to deploy**: Region, instance type, OS image
+- **How to configure**: Environment vars, health checks, startup commands
+
+Customize once, deploy anywhere!
+
+---
+
+## 🔧 Configuration
+
+Plugin config is stored at `~/.config/linode-cli.d/ai/config.yml`:
 
 ```yaml
 templates:
@@ -129,18 +238,53 @@ templates:
   cache_dir: ~/.config/linode-cli.d/ai/templates
   auto_update: true
   update_check_interval: 86400  # 24 hours
-  sources:
-    - name: official
-      url: https://raw.githubusercontent.com/linode/linode-cli-ai-templates/main/index.yml
-      enabled: true
 ```
 
-## Contributing Templates
+Deployments are tracked at `~/.config/linode-cli.d/ai/ai-deployments.json`.
 
-We welcome community contributions! To create and share your own templates:
+---
 
-1. Fork the [linode-cli-ai-templates](https://github.com/linode/linode-cli-ai-templates) repository
-2. Create your template following the [Template Development Guide](docs/template-development.md)
-3. Submit a pull request with your template
+## 📚 Documentation
 
-See [CONTRIBUTING.md](https://github.com/linode/linode-cli-ai-templates/blob/main/CONTRIBUTING.md) in the templates repository for detailed guidelines.
+- **[Template Development Guide](docs/template-development.md)** - Create custom templates
+- **[Template Deployment Guide](docs/template-deployments.md)** - Deep dive into deployments
+- **[Quick Reference](docs/template-quick-reference.md)** - Common patterns and examples
+- **[Community Templates](https://github.com/linode/linode-cli-ai-templates)** - Browse and contribute
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! Here's how you can help:
+
+### Share Your Templates
+
+1. Fork the [template repository](https://github.com/linode/linode-cli-ai-templates)
+2. Create your template following the [development guide](docs/template-development.md)
+3. Submit a pull request
+
+### Report Issues
+
+Found a bug? Have a feature request? [Open an issue](https://github.com/linode/linode-cli-ai/issues)!
+
+### Improve Documentation
+
+Documentation PRs are always welcome!
+
+---
+
+## 📝 License
+
+[Apache 2.0](LICENSE)
+
+---
+
+## 🙏 Acknowledgments
+
+Built with ❤️ for the AI and cloud computing community.
+
+Powered by [Linode](https://www.linode.com/) cloud infrastructure.
+
+---
+
+**Ready to deploy?** Start with `linode-cli ai templates list` and see what you can build! 🚀

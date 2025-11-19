@@ -6,6 +6,12 @@ description: >
   Production-style text-generation inference API powered by vLLM. Exposes a
   REST endpoint compatible with OpenAI-style completions. Requires GPU instance.
 
+capabilities:
+  runtime: docker
+  features:
+    - gpu-nvidia
+    - docker-optimize
+
 deploy:
   target: linode
   linode:
@@ -21,7 +27,6 @@ deploy:
       image: vllm/vllm-openai:latest
       internal_port: 8000
       external_port: 80
-      requires_gpu: true
       command: --model ${MODEL_NAME:-meta-llama/Meta-Llama-3-8B-Instruct} ${MAX_MODEL_LEN:+--max-model-len ${MAX_MODEL_LEN}}
       env:
         MODEL_NAME: meta-llama/Meta-Llama-3-8B-Instruct

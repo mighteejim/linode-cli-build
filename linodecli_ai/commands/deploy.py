@@ -7,15 +7,18 @@ import datetime as dt
 import re
 import secrets
 import string
+import sys
 import time
 import uuid
 from pathlib import Path
 from typing import Dict, Optional
 
+import yaml
+
+from ..core import capabilities
 from ..core import cloud_init
 from ..core import env as env_core
 from ..core import linode_api
-from ..core import project
 from ..core import registry
 from ..core import templates as template_core
 
@@ -45,30 +48,51 @@ def register(subparsers: argparse._SubParsersAction, config) -> None:
 
 
 def _cmd_deploy(args, config) -> None:
-    manifest = project.load_manifest()
-    template_name = manifest.get("template", {}).get("name")
-    if not template_name:
-        raise project.ProjectManifestError("Manifest missing template.name")
-    template = template_core.load_template(template_name)
+    # Load deploy.yml from current directory
+    deploy_file = Path.cwd() / "deploy.yml"
+    
+    if not deploy_file.exists():
+        print("Error: No deploy.yml found in current directory.", file=sys.stderr)
+        print("Run 'linode-cli ai init <template>' first to initialize a deployment.", file=sys.stderr)
+        sys.exit(1)
+    
+    try:
+        with open(deploy_file, 'r') as f:
+            data = yaml.safe_load(f)
+    except Exception as e:
+        print(f"Error loading deploy.yml: {e}", file=sys.stderr)
+        sys.exit(1)
+    
+    if not isinstance(data, dict):
+        print("Error: deploy.yml must contain a YAML object", file=sys.stderr)
+        sys.exit(1)
+    
+    # Create Template instance from deploy.yml
+    template = template_core.Template(
+        name=data.get("name", "unknown"),
+        display_name=data.get("display_name", data.get("name", "Unknown")),
+        version=str(data.get("version", "0.0.0")),
+        description=data.get("description", "").strip(),
+        data=data,
+    )
+    
     linode_cfg = template.data.get("deploy", {}).get("linode", {})
     container_cfg = linode_cfg.get("container", {})
 
-    region = args.region or manifest.get("deploy", {}).get("region") or linode_cfg.get("region_default")
-    linode_type = (
-        args.linode_type or manifest.get("deploy", {}).get("linode_type") or linode_cfg.get("type_default")
-    )
-    app_name = args.app_name or manifest.get("deploy", {}).get("app_name") or template.name
-    env_name = args.env_name or manifest.get("deploy", {}).get("env") or "default"
+    # Get deployment settings from deploy.yml (user may have customized)
+    region = args.region or linode_cfg.get("region_default")
+    linode_type = args.linode_type or linode_cfg.get("type_default")
+    app_name = args.app_name or data.get("name", "app")
+    env_name = args.env_name or "default"
     container_image = (
         args.container_image
-        or manifest.get("deploy", {}).get("container_image")
         or container_cfg.get("image")
     )
 
     if not region or not linode_type or not container_image:
-        raise RuntimeError("Region, Linode type, and container image must be defined.")
+        raise RuntimeError("Region, Linode type, and container image must be defined in deploy.yml.")
 
-    env_file = args.env_file or manifest.get("env", {}).get("file") or ".env"
+    env_file = args.env_file or ".env"
     env_values = _read_env_file(env_file, template)
     template_env = container_cfg.get("env", {})
     
@@ -96,6 +120,21 @@ def _cmd_deploy(args, config) -> None:
     external_port = int(container_cfg.get("external_port") or 80)
     requires_gpu = container_cfg.get("requires_gpu", False)
 
+    # Create capability manager if template has capabilities
+    capability_manager = capabilities.create_capability_manager(template.data)
+    
+    # Get custom setup from template
+    setup_cfg = template.data.get("setup", {})
+    custom_setup_script = setup_cfg.get("script")
+    custom_files = []
+    for file_spec in setup_cfg.get("files", []):
+        custom_files.append({
+            "path": file_spec.get("path"),
+            "permissions": file_spec.get("permissions", "0644"),
+            "owner": file_spec.get("owner", "root:root"),
+            "content": file_spec.get("content", ""),
+        })
+
     config_obj = cloud_init.CloudInitConfig(
         container_image=container_image,
         internal_port=internal_port,
@@ -104,6 +143,9 @@ def _cmd_deploy(args, config) -> None:
         post_start_script=container_cfg.get("post_start_script"),
         command=container_cfg.get("command"),
         requires_gpu=requires_gpu,
+        capability_manager=capability_manager,
+        custom_setup_script=custom_setup_script,
+        custom_files=custom_files,
     )
     user_data = cloud_init.generate_cloud_init(config_obj)
 
@@ -116,7 +158,6 @@ def _cmd_deploy(args, config) -> None:
 
     base_image = (
         args.image
-        or manifest.get("deploy", {}).get("base_image")
         or linode_cfg.get("image")
         or "linode/ubuntu24.04"
     )

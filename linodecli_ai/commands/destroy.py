@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
+
+import yaml
 
 from ..core import linode_api
 from ..core import registry
@@ -18,7 +21,22 @@ def register(subparsers: argparse._SubParsersAction, config) -> None:
 
 
 def _cmd_destroy(args, config) -> None:
-    deployments = registry.filter_deployments(app_name=args.app, env=args.env)
+    # If no app provided, try to get from deploy.yml in current directory
+    app_name = args.app
+    env_name = args.env or "default"
+    
+    if not app_name:
+        deploy_file = Path.cwd() / "deploy.yml"
+        if deploy_file.exists():
+            try:
+                with open(deploy_file, 'r') as f:
+                    data = yaml.safe_load(f)
+                    if isinstance(data, dict):
+                        app_name = data.get("name")
+            except Exception:
+                pass
+    
+    deployments = registry.filter_deployments(app_name=app_name, env=env_name)
     if args.deployment_id:
         deployments = [d for d in deployments if d.get("deployment_id") == args.deployment_id]
     if not deployments:

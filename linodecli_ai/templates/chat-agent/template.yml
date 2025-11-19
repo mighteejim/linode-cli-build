@@ -6,6 +6,9 @@ description: >
   Basic LLM chat agent using the public Ollama container. Provisions a single
   Linode, installs Docker via cloud-init, and runs `ollama/ollama:latest`.
 
+capabilities:
+  runtime: docker
+
 deploy:
   target: linode
   linode:

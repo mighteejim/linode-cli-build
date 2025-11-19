@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Dict, Optional, Any, List
 
 import yaml
+
+from . import capabilities as cap_module
 
 
 @dataclass
@@ -17,20 +19,37 @@ class CloudInitConfig:
     post_start_script: Optional[str] = None
     command: Optional[str] = None
     requires_gpu: bool = False
+    capability_manager: Optional[cap_module.CapabilityManager] = None
+    custom_setup_script: Optional[str] = None
+    custom_files: List[Dict[str, Any]] = field(default_factory=list)
 
 
 def generate_cloud_init(config: CloudInitConfig) -> str:
-    """Render a cloud-init YAML payload for provisioning the Linode."""
+    """Render a cloud-init YAML payload for provisioning the Linode.
     
-    # If GPU is required, add bootcmd to blacklist Nouveau early
+    This function supports two modes:
+    1. Capability-based (new): Uses CapabilityManager to assemble cloud-init
+    2. Legacy (backward compatible): Uses hardcoded GPU/Docker logic
+    """
+    
+    # Get capability fragments if using new system
+    cap_fragments = None
+    if config.capability_manager:
+        cap_fragments = config.capability_manager.assemble_fragments()
+    
+    # Build bootcmd (capability-based or legacy)
     bootcmd = []
-    if config.requires_gpu:
+    if cap_fragments:
+        bootcmd.extend(cap_fragments.bootcmd)
+    elif config.requires_gpu:
+        # Legacy GPU bootcmd
         bootcmd = [
             "echo 'blacklist nouveau' > /etc/modprobe.d/blacklist-nouveau.conf",
             "echo 'options nouveau modeset=0' >> /etc/modprobe.d/blacklist-nouveau.conf",
             "update-initramfs -u || true",
         ]
     
+    # Build write_files
     write_files = [
         {
             "path": "/etc/build-ai.env",
@@ -45,13 +64,52 @@ def generate_cloud_init(config: CloudInitConfig) -> str:
             "content": _render_start_script(config),
         },
     ]
+    
+    # Add capability write_files
+    if cap_fragments:
+        write_files.extend(cap_fragments.write_files)
+    
+    # Add custom files
+    write_files.extend(config.custom_files)
+    
+    # Add custom setup script if provided
+    if config.custom_setup_script:
+        write_files.append({
+            "path": "/usr/local/bin/custom-setup.sh",
+            "permissions": "0755",
+            "owner": "root:root",
+            "content": config.custom_setup_script,
+        })
+
+    # Build runcmd
+    runcmd = []
+    
+    # Add capability runcmd
+    if cap_fragments:
+        # Add packages installation first
+        if cap_fragments.packages:
+            packages_str = " ".join(cap_fragments.packages)
+            runcmd.extend([
+                "export DEBIAN_FRONTEND=noninteractive",
+                "apt-get update -qq || true",
+                f"apt-get install -y -qq {packages_str} || true",
+            ])
+        # Then run capability commands
+        runcmd.extend(cap_fragments.runcmd)
+    
+    # Run custom setup script if provided
+    if config.custom_setup_script:
+        runcmd.append("/bin/sh /usr/local/bin/custom-setup.sh")
+    
+    # Finally run the container start script
+    runcmd.append(["/bin/sh", "/usr/local/bin/start-container.sh"])
 
     doc = {
         "write_files": write_files,
-        "runcmd": [["/bin/sh", "/usr/local/bin/start-container.sh"]],
+        "runcmd": runcmd,
     }
     
-    # Add bootcmd if GPU required
+    # Add bootcmd if needed
     if bootcmd:
         doc["bootcmd"] = bootcmd
     
@@ -68,6 +126,15 @@ def _render_env_file(env_vars: Dict[str, str]) -> str:
 
 
 def _render_start_script(config: CloudInitConfig) -> str:
+    # Check if GPU is required from either legacy flag or capabilities
+    requires_gpu = config.requires_gpu
+    if config.capability_manager:
+        # Check if any capability is GPU-related
+        for cap in config.capability_manager.capabilities:
+            if cap.name() in ["gpu-nvidia", "gpu-amd"]:
+                requires_gpu = True
+                break
+    
     lines = [
         "#!/bin/sh",
         "set -eu",
@@ -75,7 +142,7 @@ def _render_start_script(config: CloudInitConfig) -> str:
         "IMAGE=\"%s\"" % config.container_image,
         "EXTERNAL_PORT=%d" % config.external_port,
         "INTERNAL_PORT=%d" % config.internal_port,
-        "REQUIRES_GPU=%s" % ("true" if config.requires_gpu else "false"),
+        "REQUIRES_GPU=%s" % ("true" if requires_gpu else "false"),
         "",
         "install_docker() {",
         "  if command -v docker >/dev/null 2>&1; then",
@@ -210,7 +277,7 @@ def _render_start_script(config: CloudInitConfig) -> str:
         "  -p ${EXTERNAL_PORT}:${INTERNAL_PORT} \\",
     ]
     
-    if config.requires_gpu:
+    if requires_gpu:
         docker_run_lines.append("  --gpus all \\")
     
     lines.extend(docker_run_lines)
