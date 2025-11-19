@@ -70,7 +70,7 @@ def _load_template_from_name_or_path(name_or_path: str, version: str | None = No
         return template_core.load_template(name_or_path, version=version)
 
 
-def register(subparsers: argparse._SubParsersAction, _config) -> None:
+def register(subparsers: argparse._SubParsersAction, config) -> None:
     parser = subparsers.add_parser("init", help="Initialize a project from a template")
     parser.add_argument("template", help="Template name (e.g., 'chat-agent') or local path (e.g., './my-template')")
     parser.add_argument(
@@ -78,10 +78,15 @@ def register(subparsers: argparse._SubParsersAction, _config) -> None:
         "-d",
         help="Project directory (defaults to current working directory)",
     )
-    parser.set_defaults(func=_cmd_init)
+    parser.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="Skip interactive prompts, use template defaults",
+    )
+    parser.set_defaults(func=lambda args: _cmd_init(args, config))
 
 
-def _cmd_init(args):
+def _cmd_init(args, config):
     # Parse template name and version (e.g., 'chat-agent@0.2.0')
     template_spec = args.template
     version = None
@@ -102,9 +107,14 @@ def _cmd_init(args):
     _ensure_can_write(deploy_yml_path)
     _ensure_can_write(env_example_path)
 
+    # Interactive selection of region and plan (unless --non-interactive)
+    deploy_data = template.data.copy()
+    if not args.non_interactive:
+        deploy_data = _interactive_configure(config, deploy_data)
+    
     # Write deploy.yml (complete deployment config, user can edit)
     deploy_yml_path.write_text(
-        yaml.safe_dump(template.data, sort_keys=False),
+        yaml.safe_dump(deploy_data, sort_keys=False),
         encoding="utf-8",
     )
 
@@ -212,3 +222,149 @@ def _render_readme(template) -> str:
         "2. Deploy with `linode-cli build deploy`.",
     ]
     return "\n".join(content) + "\n"
+
+
+def _interactive_configure(config, deploy_data: dict) -> dict:
+    """Interactively select region and instance type."""
+    import sys
+    
+    client = config.client
+    linode_cfg = deploy_data.get("deploy", {}).get("linode", {})
+    
+    # Get template defaults
+    default_region = linode_cfg.get("region_default")
+    default_type = linode_cfg.get("type_default")
+    
+    print()
+    print("=== Interactive Configuration ===")
+    print()
+    
+    # Fetch and select region
+    try:
+        print("Fetching available regions...")
+        regions = list(client.regions())
+        region = _select_region(regions, default_region)
+    except Exception as e:
+        print(f"Warning: Could not fetch regions ({e}). Using template default.")
+        region = default_region
+    
+    # Fetch and select instance type
+    try:
+        print()
+        print("Fetching available instance types...")
+        types = list(client.linode.types())
+        instance_type = _select_instance_type(types, default_type)
+    except Exception as e:
+        print(f"Warning: Could not fetch instance types ({e}). Using template default.")
+        instance_type = default_type
+    
+    # Update deploy_data with selections
+    if region:
+        deploy_data["deploy"]["linode"]["region_default"] = region
+    if instance_type:
+        deploy_data["deploy"]["linode"]["type_default"] = instance_type
+    
+    print()
+    print(f"✓ Selected region: {region or default_region}")
+    print(f"✓ Selected instance type: {instance_type or default_type}")
+    
+    return deploy_data
+
+
+def _select_region(regions, default: str) -> str:
+    """Interactive region selection."""
+    import sys
+    
+    # Sort regions by ID
+    sorted_regions = sorted(regions, key=lambda r: r.id)
+    
+    print()
+    print("Available Regions:")
+    print("-" * 60)
+    
+    # Display regions in a compact format
+    for i, region in enumerate(sorted_regions, 1):
+        status = "✓" if region.status == "ok" else "✗"
+        default_marker = " (default)" if region.id == default else ""
+        print(f"{i:3}. {status} {region.id:20} - {region.label}{default_marker}")
+    
+    print("-" * 60)
+    
+    # Get user selection
+    while True:
+        prompt = f"Select region [1-{len(sorted_regions)}] (Enter for default: {default}): "
+        choice = input(prompt).strip()
+        
+        if not choice:
+            return default
+        
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(sorted_regions):
+                return sorted_regions[idx].id
+            else:
+                print(f"Invalid choice. Please enter 1-{len(sorted_regions)}")
+        except ValueError:
+            print("Invalid input. Please enter a number.")
+
+
+def _select_instance_type(types, default: str) -> str:
+    """Interactive instance type selection."""
+    import sys
+    
+    # Filter and categorize types
+    gpu_types = [t for t in types if t.id.startswith('g6-')]
+    standard_types = [t for t in types if not t.id.startswith('g6-') and t.class_type in ['standard', 'dedicated']]
+    
+    # Sort by price
+    gpu_types.sort(key=lambda t: t.price.hourly)
+    standard_types.sort(key=lambda t: t.price.hourly)
+    
+    print()
+    print("Available Instance Types:")
+    print("=" * 80)
+    
+    all_types = []
+    
+    # Show GPU types
+    if gpu_types:
+        print()
+        print("GPU Instances (for AI/ML workloads):")
+        print("-" * 80)
+        for t in gpu_types[:10]:  # Limit to top 10
+            default_marker = " (default)" if t.id == default else ""
+            idx = len(all_types) + 1
+            all_types.append(t)
+            print(f"{idx:3}. {t.id:20} ${t.price.hourly:6.2f}/hr  "
+                  f"{t.memory:5}MB RAM  {t.vcpus:2} vCPUs  {t.disk:6}MB{default_marker}")
+    
+    # Show standard types
+    if standard_types:
+        print()
+        print("Standard Instances:")
+        print("-" * 80)
+        for t in standard_types[:15]:  # Limit to top 15
+            default_marker = " (default)" if t.id == default else ""
+            idx = len(all_types) + 1
+            all_types.append(t)
+            print(f"{idx:3}. {t.id:20} ${t.price.hourly:6.2f}/hr  "
+                  f"{t.memory:5}MB RAM  {t.vcpus:2} vCPUs  {t.disk:6}MB{default_marker}")
+    
+    print("=" * 80)
+    
+    # Get user selection
+    while True:
+        prompt = f"Select instance type [1-{len(all_types)}] (Enter for default: {default}): "
+        choice = input(prompt).strip()
+        
+        if not choice:
+            return default
+        
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(all_types):
+                return all_types[idx].id
+            else:
+                print(f"Invalid choice. Please enter 1-{len(all_types)}")
+        except ValueError:
+            print("Invalid input. Please enter a number.")
