@@ -5,3 +5,5 @@ templates:
     path: templates/llm-api/template.yml
   - name: embeddings-python
     path: templates/embeddings-python/template.yml
+  - name: ml-pipeline
+    path: templates/ml-pipeline/template.yml

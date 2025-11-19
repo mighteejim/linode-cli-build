@@ -1,0 +1,141 @@
+name: ml-pipeline
+display_name: ML Pipeline
+version: 0.1.0
+description: 'Production ML inference pipeline with batching, caching, and monitoring.
+  Powered by PyTorch for model inference, FastAPI for REST endpoints, Redis for request
+  caching, and Prometheus for metrics collection. Requires GPU instance for optimal
+  performance.
+
+  '
+capabilities:
+  runtime: docker
+  features:
+  - gpu-nvidia
+  - docker-optimize
+  - redis
+deploy:
+  target: linode
+  linode:
+    image: linode/ubuntu22.04
+    region_default: us-ord
+    type_default: g2-gpu-rtx4000a4-m
+    tags:
+    - ai
+    - ml
+    - gpu
+    - pytorch
+    - fastapi
+    container:
+      image: pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime
+      internal_port: 8000
+      external_port: 80
+      command: "bash -c 'pip install -q fastapi uvicorn[standard] redis prometheus-client\
+        \ pillow && python -c \" from fastapi import FastAPI from prometheus_client\
+        \ import Counter, Histogram, generate_latest from prometheus_client.openmetrics.exposition\
+        \ import CONTENT_TYPE_LATEST import redis import torch from PIL import Image\
+        \ import uvicorn import os\napp = FastAPI(title=\\\"ML Inference Pipeline\\\
+        \") redis_client = redis.Redis(host=os.getenv(\\\"REDIS_HOST\\\", \\\"localhost\\\
+        \"),\n                           port=int(os.getenv(\\\"REDIS_PORT\\\", \\\
+        \"6379\\\")),\n                           db=int(os.getenv(\\\"REDIS_DB\\\"\
+        , \\\"0\\\")))\n\n# Prometheus metrics request_count = Counter(\\\"ml_requests_total\\\
+        \", \\\"Total inference requests\\\") request_duration = Histogram(\\\"ml_request_duration_seconds\\\
+        \", \\\"Request duration\\\") batch_size = Histogram(\\\"ml_batch_size\\\"\
+        , \\\"Batch size per request\\\")\n@app.get(\\\"/health\\\") def health():\n\
+        \    return {\\\"status\\\": \\\"healthy\\\", \\\"gpu_available\\\": torch.cuda.is_available()}\n\
+        \n@app.get(\\\"/metrics\\\") def metrics():\n    return generate_latest()\n\
+        \n@app.post(\\\"/predict\\\") def predict(data: dict):\n    request_count.inc()\n\
+        \    with request_duration.time():\n        # Your ML inference logic here\n\
+        \        result = {\\\"prediction\\\": \\\"example_output\\\"}\n        return\
+        \ result\n\nif __name__ == \\\"__main__\\\":\n    uvicorn.run(app, host=\\\
+        \"0.0.0.0\\\", port=8000)\n\"'\n"
+      env:
+        REDIS_HOST: ${REDIS_HOST:-localhost}
+        REDIS_PORT: ${REDIS_PORT:-6379}
+        REDIS_DB: ${REDIS_DB:-0}
+        LOG_LEVEL: ${LOG_LEVEL:-info}
+        BATCH_SIZE: ${BATCH_SIZE:-32}
+        CACHE_TTL: ${CACHE_TTL:-3600}
+      health:
+        type: http
+        path: /health
+        port: 8000
+        success_codes:
+        - 200
+        initial_delay_seconds: 1500
+        timeout_seconds: 10
+        max_retries: 30
+env:
+  required: []
+  optional:
+  - name: REDIS_HOST
+    description: 'Redis server hostname for caching. Default: localhost
+
+      The Redis service is automatically provisioned via capabilities.
+
+      '
+  - name: REDIS_PORT
+    description: Redis server port.
+    Default: 6379
+  - name: REDIS_DB
+    description: Redis database number.
+    Default: 0
+  - name: LOG_LEVEL
+    description: 'Logging level. Options: debug, info, warning, error
+
+      Default: info
+
+      '
+  - name: BATCH_SIZE
+    description: 'Default batch size for inference requests. Larger batches improve
+
+      throughput but increase latency. Default: 32
+
+      '
+  - name: CACHE_TTL
+    description: 'Cache time-to-live in seconds for inference results.
+
+      Default: 3600 (1 hour)
+
+      '
+guidance:
+  summary: 'Production ML inference pipeline with batching, caching, and monitoring.
+
+    The service exposes a FastAPI REST API on port 80 with the following endpoints:
+
+
+    - /health - Health check endpoint
+
+    - /metrics - Prometheus metrics endpoint
+
+    - /predict - ML inference endpoint (POST)
+
+
+    Replace {host} with your Linode hostname or IP address.
+
+
+    The service includes:
+
+    - GPU-accelerated PyTorch inference
+
+    - Redis caching for request/response caching
+
+    - Prometheus metrics for monitoring
+
+    - Request batching for improved throughput
+
+
+    Configure batch size, cache TTL, and logging via environment variables.
+
+    '
+  examples:
+  - description: Health check
+    command: curl http://{host}/health
+  - description: Check Prometheus metrics
+    command: curl http://{host}/metrics
+  - description: Run inference prediction
+    command: "curl -X POST http://{host}/predict \\\n  -H 'Content-Type: application/json'\
+      \ \\\n  -d '{\"input\": \"your_data_here\"}'\n"
+  - description: Check GPU availability
+    command: 'curl http://{host}/health | jq ''.gpu_available''
+
+      '
