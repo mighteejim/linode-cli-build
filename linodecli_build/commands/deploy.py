@@ -118,9 +118,8 @@ def _cmd_deploy(args, config) -> None:
 
     internal_port = int(container_cfg.get("internal_port") or 8000)
     external_port = int(container_cfg.get("external_port") or 80)
-    requires_gpu = container_cfg.get("requires_gpu", False)
 
-    # Create capability manager if template has capabilities
+    # Create capability manager from template
     capability_manager = capabilities.create_capability_manager(template.data)
     
     # Get custom setup from template
@@ -142,11 +141,10 @@ def _cmd_deploy(args, config) -> None:
         container_image=container_image,
         internal_port=internal_port,
         external_port=external_port,
+        capability_manager=capability_manager,
         env_vars=merged_env,
         post_start_script=container_cfg.get("post_start_script"),
         command=container_cfg.get("command"),
-        requires_gpu=requires_gpu,
-        capability_manager=capability_manager,
         custom_setup_script=custom_setup_script,
         custom_files=custom_files,
         volumes=volumes,
