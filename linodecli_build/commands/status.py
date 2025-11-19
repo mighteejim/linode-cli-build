@@ -46,14 +46,17 @@ def _cmd_status(args, config) -> None:
 
 def _fetch_status(client, deployment: Dict, skip_health: bool) -> Tuple[str, str]:
     try:
-        instance = client.linode.instances.get(deployment["linode_id"])
+        status, response = client.call_operation('linodes', 'view', [str(deployment["linode_id"])])
+        if status != 200:
+            return "error", f"Failed to fetch status: {response}"
+        instance = response
     except Exception as exc:
         message = str(exc)
         if "Not Found" in message or "404" in message:
             return "missing", "Linode instance not found"
         return "error", message
 
-    api_status = instance.status
+    api_status = instance.get('status', 'unknown')
     mapped = _map_status(api_status)
     detail = f"Linode status: {api_status}"
     if mapped == "running" and not skip_health:

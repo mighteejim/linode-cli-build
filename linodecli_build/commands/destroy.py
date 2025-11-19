@@ -63,7 +63,9 @@ def _cmd_destroy(args, config) -> None:
         if linode_id:
             print(f"Deleting Linode {linode_id}...")
             try:
-                client.linode.instances.delete(linode_id)
+                status, response = client.call_operation('linodes', 'delete', [str(linode_id)])
+                if status not in [200, 204]:
+                    print(f"Warning: failed to delete Linode {linode_id}: {response}")
             except Exception as exc:
                 print(f"Warning: failed to delete Linode {linode_id}: {exc}")
         registry.remove_deployment(dep["deployment_id"])

@@ -169,19 +169,23 @@ def _cmd_deploy(args, config) -> None:
     # Encode user_data as base64 for metadata
     b64_user_data = base64.b64encode(user_data.encode("utf-8")).decode("utf-8")
     
-    # Create instance using native client
-    instance = client.linode.instances.create(
-        ltype=linode_type,
-        region=region,
-        image=base_image,
-        label=label,
-        tags=tags,
-        group="build",
-        root_pass=root_pass,
-        metadata={"user_data": b64_user_data},
-    )
+    # Create instance using CLI call_operation
+    status, response = client.call_operation('linodes', 'create', [
+        '--type', linode_type,
+        '--region', region,
+        '--image', base_image,
+        '--label', label,
+        '--tags', ','.join(tags),
+        '--group', 'build',
+        '--root_pass', root_pass,
+        '--metadata.user_data', b64_user_data,
+    ])
     
-    linode_id = instance.id
+    if status != 200:
+        raise RuntimeError(f"Failed to create Linode: {response}")
+    
+    instance = response
+    linode_id = instance.get('id')
     ipv4 = _primary_ipv4(instance)
     hostname = _derive_hostname(ipv4)
 
@@ -201,14 +205,14 @@ def _cmd_deploy(args, config) -> None:
         "external_port": external_port,
         "internal_port": internal_port,
         "created_at": dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "last_status": instance.status,
+        "last_status": instance.get('status', 'provisioning'),
     }
     registry.add_deployment(record)
 
     if args.wait:
         print("Waiting for Linode to reach running state...")
         instance = _wait_for_instance_status(client, linode_id, desired="running")
-        record["last_status"] = instance.status
+        record["last_status"] = instance.get('status', 'running')
         registry.update_fields(deployment_id, {"last_status": record["last_status"]})
         print(
             "Linode is running. Container start-up can take several minutes; "
@@ -243,9 +247,10 @@ def _read_env_file(path: str, template) -> Dict[str, str]:
 
 
 def _primary_ipv4(instance) -> str:
-    """Extract primary IPv4 from instance object."""
-    if hasattr(instance, 'ipv4') and instance.ipv4:
-        return instance.ipv4[0]
+    """Extract primary IPv4 from instance dict."""
+    ipv4_list = instance.get('ipv4', [])
+    if ipv4_list and len(ipv4_list) > 0:
+        return ipv4_list[0]
     raise RuntimeError("Instance missing IPv4 address.")
 
 
@@ -259,9 +264,11 @@ def _wait_for_instance_status(client, instance_id: int, desired: str = "running"
     """Poll Linode until it reaches the desired status or timeout."""
     deadline = time.time() + timeout
     while time.time() < deadline:
-        instance = client.linode.instances.get(instance_id)
-        if instance.status == desired:
-            return instance
+        status, response = client.call_operation('linodes', 'view', [str(instance_id)])
+        if status == 200:
+            instance = response
+            if instance.get('status') == desired:
+                return instance
         time.sleep(poll)
     raise RuntimeError(
         f"Linode {instance_id} did not reach status {desired} within {timeout}s"
