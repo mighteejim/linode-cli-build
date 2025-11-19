@@ -170,16 +170,22 @@ def _cmd_deploy(args, config) -> None:
     b64_user_data = base64.b64encode(user_data.encode("utf-8")).decode("utf-8")
     
     # Create instance using CLI call_operation
-    status, response = client.call_operation('linodes', 'create', [
+    # Build args list with multiple --tags arguments
+    create_args = [
         '--type', linode_type,
         '--region', region,
         '--image', base_image,
         '--label', label,
-        '--tags', ','.join(tags),
         '--group', 'build',
         '--root_pass', root_pass,
         '--metadata.user_data', b64_user_data,
-    ])
+    ]
+    
+    # Add each tag as a separate --tags argument
+    for tag in tags:
+        create_args.extend(['--tags', tag])
+    
+    status, response = client.call_operation('linodes', 'create', create_args)
     
     if status != 200:
         raise RuntimeError(f"Failed to create Linode: {response}")
