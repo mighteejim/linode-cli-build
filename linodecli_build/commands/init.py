@@ -242,9 +242,9 @@ def _interactive_configure(config, deploy_data: dict) -> dict:
     # Fetch and select region
     try:
         print("Fetching available regions...")
-        # Use CLI call_operation to fetch regions
-        result = client.call_operation('regions', 'list')
-        regions = result if isinstance(result, list) else []
+        # call_operation returns (status_code, response_dict)
+        status, response = client.call_operation('regions', 'list')
+        regions = response.get('data', []) if status == 200 else []
         if regions:
             region = _select_region(regions, default_region)
         else:
@@ -258,9 +258,9 @@ def _interactive_configure(config, deploy_data: dict) -> dict:
     try:
         print()
         print("Fetching available instance types...")
-        # Use CLI call_operation to fetch types
-        result = client.call_operation('linodes', 'types')
-        types = result if isinstance(result, list) else []
+        # call_operation returns (status_code, response_dict)
+        status, response = client.call_operation('linodes', 'types')
+        types = response.get('data', []) if status == 200 else []
         if types:
             instance_type = _select_instance_type(types, default_type)
         else:
