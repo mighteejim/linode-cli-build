@@ -242,7 +242,8 @@ def _interactive_configure(config, deploy_data: dict) -> dict:
     # Fetch and select region
     try:
         print("Fetching available regions...")
-        regions = list(client.regions())
+        # Use the correct API path for regions
+        regions = client.regions.list()
         region = _select_region(regions, default_region)
     except Exception as e:
         print(f"Warning: Could not fetch regions ({e}). Using template default.")
@@ -252,7 +253,8 @@ def _interactive_configure(config, deploy_data: dict) -> dict:
     try:
         print()
         print("Fetching available instance types...")
-        types = list(client.linode.types())
+        # Use the correct API path for types
+        types = client.linode.types.list()
         instance_type = _select_instance_type(types, default_type)
     except Exception as e:
         print(f"Warning: Could not fetch instance types ({e}). Using template default.")
