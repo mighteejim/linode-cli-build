@@ -277,6 +277,10 @@ def _render_start_script(config: CloudInitConfig) -> str:
         "  -p ${EXTERNAL_PORT}:${INTERNAL_PORT} \\",
     ]
     
+    # Mount /app if custom files were created
+    if config.custom_files:
+        docker_run_lines.append("  -v /app:/app \\")
+    
     if requires_gpu:
         docker_run_lines.append("  --gpus all \\")
     
