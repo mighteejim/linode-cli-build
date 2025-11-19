@@ -135,6 +135,9 @@ def _cmd_deploy(args, config) -> None:
             "content": file_spec.get("content", ""),
         })
 
+    # Extract volumes from container config
+    volumes = container_cfg.get("volumes", [])
+    
     config_obj = cloud_init.CloudInitConfig(
         container_image=container_image,
         internal_port=internal_port,
@@ -146,6 +149,7 @@ def _cmd_deploy(args, config) -> None:
         capability_manager=capability_manager,
         custom_setup_script=custom_setup_script,
         custom_files=custom_files,
+        volumes=volumes,
     )
     user_data = cloud_init.generate_cloud_init(config_obj)
 

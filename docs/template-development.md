@@ -317,7 +317,48 @@ health:
 - Model loading: `initial_delay_seconds: 60-180`
 - Large models: `initial_delay_seconds: 180-300`
 
-### 4. Documentation
+### 4. Volume Mounts
+
+**Mount host directories into containers:**
+
+```yaml
+container:
+  image: pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime
+  command: python /app/main.py
+  volumes:
+    - /app:/app          # Mount application code
+    - /data:/data        # Mount data directory
+    - /models:/models    # Mount model files
+```
+
+**Common use cases:**
+- Application code written by `setup.files`
+- Persistent data storage
+- Model weights and checkpoints
+- Configuration files
+
+**Example with setup.files:**
+
+```yaml
+container:
+  command: bash /app/start.sh
+  volumes:
+    - /app:/app
+
+setup:
+  files:
+    - path: /app/main.py
+      content: |
+        # Your application code
+    - path: /app/start.sh
+      permissions: "0755"
+      content: |
+        #!/bin/bash
+        pip install -r /app/requirements.txt
+        python /app/main.py
+```
+
+### 5. Documentation
 
 **Include helpful guidance:**
 
@@ -342,7 +383,7 @@ guidance:
           -d '{"input": "your data here"}'
 ```
 
-### 5. Instance Sizing
+### 6. Instance Sizing
 
 **Choose appropriate defaults:**
 
@@ -353,7 +394,7 @@ guidance:
 | Large models (13-30B) | `g6-dedicated-16` | 1x RTX 6000 Ada | 64GB | Large models |
 | CPU workloads | `g6-standard-2` | None | 8GB | Utilities, embeddings |
 
-### 6. Base Images
+### 7. Base Images
 
 **GPU workloads:**
 - Use: `linode/ubuntu22.04` (proven stability)
@@ -363,7 +404,7 @@ guidance:
 - Use: `linode/ubuntu24.04` (latest LTS)
 - Alternative: `linode/debian12`
 
-### 7. Version Management
+### 8. Version Management
 
 **Semantic versioning:**
 ```yaml
@@ -374,7 +415,7 @@ version: 0.1.0  # MAJOR.MINOR.PATCH
 - **MINOR**: New features (backward compatible)
 - **PATCH**: Bug fixes
 
-### 8. Tags
+### 9. Tags
 
 **Use descriptive tags:**
 

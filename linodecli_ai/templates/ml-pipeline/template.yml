@@ -29,6 +29,8 @@ deploy:
       internal_port: 8000
       external_port: 80
       command: bash /app/start.sh
+      volumes:
+        - /app:/app
       env:
         REDIS_HOST: ${REDIS_HOST:-localhost}
         REDIS_PORT: ${REDIS_PORT:-6379}

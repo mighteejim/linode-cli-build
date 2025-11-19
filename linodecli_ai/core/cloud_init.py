@@ -22,6 +22,7 @@ class CloudInitConfig:
     capability_manager: Optional[cap_module.CapabilityManager] = None
     custom_setup_script: Optional[str] = None
     custom_files: List[Dict[str, Any]] = field(default_factory=list)
+    volumes: List[str] = field(default_factory=list)
 
 
 def generate_cloud_init(config: CloudInitConfig) -> str:
@@ -277,9 +278,9 @@ def _render_start_script(config: CloudInitConfig) -> str:
         "  -p ${EXTERNAL_PORT}:${INTERNAL_PORT} \\",
     ]
     
-    # Mount /app if custom files were created
-    if config.custom_files:
-        docker_run_lines.append("  -v /app:/app \\")
+    # Add volume mounts from template config
+    for volume in config.volumes:
+        docker_run_lines.append(f"  -v {volume} \\")
     
     if requires_gpu:
         docker_run_lines.append("  --gpus all \\")
