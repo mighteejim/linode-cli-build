@@ -128,6 +128,33 @@ def _render_start_script(config: CloudInitConfig) -> str:
         "EXTERNAL_PORT=%d" % config.external_port,
         "INTERNAL_PORT=%d" % config.internal_port,
         "",
+    ]
+    
+    # Add GPU verification if needed
+    if requires_gpu:
+        lines.extend([
+            "# Wait for NVIDIA drivers to be ready",
+            "echo \"Waiting for NVIDIA drivers...\"",
+            "for i in 1 2 3 4 5 6 7 8 9 10; do",
+            "  if nvidia-smi >/dev/null 2>&1; then",
+            "    echo \"✓ NVIDIA drivers ready\"",
+            "    nvidia-smi --query-gpu=name,driver_version --format=csv,noheader || true",
+            "    break",
+            "  fi",
+            "  echo \"  Attempt $i/10: waiting for drivers...\"",
+            "  sleep 5",
+            "done",
+            "",
+            "# Verify NVIDIA drivers are working",
+            "if ! nvidia-smi >/dev/null 2>&1; then",
+            "  echo \"ERROR: NVIDIA drivers not available after 50 seconds\" >&2",
+            "  echo \"This may require a system reboot to initialize the GPU\" >&2",
+            "  exit 1",
+            "fi",
+            "",
+        ])
+    
+    lines.extend([
         "# Wait for Docker to be ready",
         "i=0",
         "while [ $i -lt 30 ]; do",
