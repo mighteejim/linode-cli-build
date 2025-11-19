@@ -25,7 +25,8 @@ class LLMInstructionsGenerator:
         try:
             from importlib import resources
             
-            templates_to_load = ["llm-api", "chat-agent", "embeddings-python"]
+            # Include ml-pipeline as it demonstrates setup.files + volumes pattern
+            templates_to_load = ["llm-api", "chat-agent", "embeddings-python", "ml-pipeline"]
             
             for template_name in templates_to_load:
                 try:
@@ -122,6 +123,13 @@ capabilities:           # Optional: Declarative requirements
     - gpu-nvidia
   packages: []
 
+setup:                  # Optional: Write files to host
+  files:
+    - path: /app/main.py
+      permissions: "0644"
+      content: |
+        # Your application code
+
 deploy:
   target: linode
   linode:
@@ -133,7 +141,9 @@ deploy:
       image: docker/image:tag
       internal_port: 8000
       external_port: 80
-      command: optional command override
+      command: bash /app/start.sh
+      volumes:
+        - /app:/app       # Mount host files into container
       env: {}
       health:
         type: http
@@ -198,6 +208,54 @@ capabilities:
     - any-apt-package
 ```
 
+### Writing Files to the Host (setup.files)
+
+**CRITICAL: Use this for application code instead of inline bash commands!**
+
+The `setup.files` section lets you write files to the host filesystem that are then mounted into containers:
+
+```yaml
+setup:
+  files:
+    - path: /app/main.py
+      permissions: "0644"
+      content: |
+        # Your Python application code here
+        from fastapi import FastAPI
+        app = FastAPI()
+        
+        @app.get("/health")
+        def health():
+            return {"status": "ok"}
+    
+    - path: /app/requirements.txt
+      permissions: "0644"
+      content: |
+        fastapi
+        uvicorn
+    
+    - path: /app/start.sh
+      permissions: "0755"
+      content: |
+        #!/bin/bash
+        set -e
+        pip install -r /app/requirements.txt
+        python /app/main.py
+
+deploy:
+  linode:
+    container:
+      command: bash /app/start.sh
+      volumes:
+        - /app:/app  # Mount host /app into container
+```
+
+**Benefits:**
+- Clean, readable application code
+- Easy to debug and maintain
+- No escaping issues with inline scripts
+- Proper file permissions and ownership
+
 ### Custom Setup Scripts (Advanced)
 
 For complex scenarios not covered by capabilities:
@@ -208,10 +266,6 @@ setup:
     #!/bin/bash
     # Your custom setup commands
     echo "Custom setup running..."
-  files:
-    - path: /etc/myapp/config.yml
-      content: |
-        setting: value
 ```
 """
     
@@ -304,7 +358,14 @@ Study these real templates from the system:
 
 **deploy.linode.container.command** (string, optional)
 - Override container CMD
+- Keep this SIMPLE - use setup.files for complex logic
 - Supports variable expansion: `${VAR}`, `${VAR:-default}`
+- Example: `bash /app/start.sh` (where start.sh is created via setup.files)
+
+**deploy.linode.container.volumes** (array, optional but recommended with setup.files)
+- Docker volume mounts in format `host:container`
+- Required when using setup.files to write application code
+- Example: `["/app:/app", "/data:/data"]`
 
 **deploy.linode.container.env** (object, optional)
 - Default environment variables
@@ -364,6 +425,53 @@ Study these real templates from the system:
     
     def _render_best_practices(self) -> str:
         return """## Best Practices
+
+### Application Code and Container Commands
+
+**DO NOT USE** inline bash commands with embedded Python/application code:
+
+```yaml
+# ❌ BAD - Hard to read, maintain, and debug
+container:
+  command: "bash -c 'pip install fastapi && python -c \"from fastapi import FastAPI; app = FastAPI()...\"'"
+```
+
+**DO USE** setup.files with volume mounts:
+
+```yaml
+# ✅ GOOD - Clean, maintainable, debuggable
+setup:
+  files:
+    - path: /app/main.py
+      content: |
+        from fastapi import FastAPI
+        app = FastAPI()
+    - path: /app/start.sh
+      permissions: "0755"
+      content: |
+        #!/bin/bash
+        pip install -r /app/requirements.txt
+        python /app/main.py
+
+deploy:
+  linode:
+    container:
+      command: bash /app/start.sh
+      volumes:
+        - /app:/app
+```
+
+### Volume Mounts
+
+**Always declare volume mounts explicitly when using setup.files:**
+
+```yaml
+container:
+  volumes:
+    - /app:/app          # Application code
+    - /data:/data        # Data storage (if needed)
+    - /models:/models    # Model weights (if needed)
+```
 
 ### GPU Templates
 
