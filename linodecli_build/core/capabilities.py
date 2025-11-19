@@ -65,12 +65,14 @@ class DockerCapability(Capability):
         
         # Install Docker using official convenience script
         fragments.runcmd.extend([
+            # Install prerequisites
+            "apt-get update -qq",
+            "apt-get install -y ca-certificates curl",
+            "",
             # Install Docker
             "curl -fsSL https://get.docker.com -o get-docker.sh",
             "sh get-docker.sh",
             "rm get-docker.sh",
-            "systemctl enable docker",
-            "systemctl start docker",
         ])
         
         # Configure daemon.json if optimization is requested
@@ -81,8 +83,12 @@ class DockerCapability(Capability):
                 "owner": "root:root",
                 "content": '{"max-concurrent-downloads": 10}\n',
             })
-            # Restart Docker to apply config
-            fragments.runcmd.append("systemctl restart docker")
+        
+        # Start Docker (after any config changes)
+        fragments.runcmd.extend([
+            "systemctl enable docker",
+            "systemctl start docker",
+        ])
         
         return fragments
 
@@ -109,15 +115,17 @@ class GPUNvidiaCapability(Capability):
         # Install NVIDIA drivers and container toolkit
         fragments.runcmd.extend([
             # Install NVIDIA drivers
+            "apt-get update -qq",
             "ubuntu-drivers devices || true",
             "ubuntu-drivers autoinstall || true",
             "",
-            # Load NVIDIA kernel modules
-            "modprobe nvidia || true",
+            # Wait for driver installation to complete and try to load modules
+            "sleep 5",
+            "for i in 1 2 3 4 5; do modprobe nvidia && break || sleep 2; done",
             "modprobe nvidia-uvm || true",
             "",
-            # Verify NVIDIA drivers are loaded
-            "nvidia-smi || echo 'Warning: nvidia-smi not available yet'",
+            # Verify NVIDIA drivers are loaded (with retries)
+            "for i in 1 2 3 4 5; do nvidia-smi && break || sleep 3; done",
             "",
             # Install NVIDIA Container Toolkit
             "curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg",
@@ -125,7 +133,10 @@ class GPUNvidiaCapability(Capability):
             "apt-get update -qq",
             "apt-get install -y nvidia-container-toolkit",
             "nvidia-ctk runtime configure --runtime=docker",
-            "systemctl restart docker || true",
+            "systemctl restart docker",
+            "",
+            # Wait for Docker to be ready with GPU support
+            "sleep 3",
         ])
         
         return fragments
