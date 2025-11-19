@@ -184,7 +184,7 @@ def _find_record(name: str) -> Optional[TemplateRecord]:
 def _load_yaml_resource(relative_path: str) -> Any:
     """Load a YAML document stored with the package."""
     try:
-        resource = resources.files("linodecli_ai").joinpath(relative_path)
+        resource = resources.files("linodecli_build").joinpath(relative_path)
     except FileNotFoundError as exc:
         raise TemplateError(f"Missing resource: {relative_path}") from exc
 
