@@ -259,7 +259,7 @@ def _interactive_configure(config, deploy_data: dict) -> dict:
         print()
         print("Fetching available instance types...")
         # Use CLI call_operation to fetch types
-        result = client.call_operation('linode', 'types-list')
+        result = client.call_operation('linodes', 'types')
         types = result if isinstance(result, list) else []
         if types:
             instance_type = _select_instance_type(types, default_type)
