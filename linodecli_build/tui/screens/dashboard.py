@@ -97,12 +97,8 @@ class DashboardScreen(Screen):
     
     def compose(self):
         """Compose the dashboard screen."""
-        yield Header(show_clock=True)
-        
-        # Enhanced header with version, title, and GitHub link
+        # Enhanced header with version, title, and date
         from ... import PLUGIN_VERSION
-        
-        current_date = datetime.now().strftime("%Y-%m-%d")
         
         with Horizontal(id="header-info"):
             yield Static(
@@ -116,7 +112,7 @@ class DashboardScreen(Screen):
                 classes="header-section"
             )
             yield Static(
-                f"{current_date}",
+                "",  # Will be updated with time in on_mount
                 id="header-right",
                 classes="header-section"
             )
@@ -148,6 +144,19 @@ class DashboardScreen(Screen):
         self._animation_timer = self.set_interval(0.5, self._animate_status)
         # Start auto-refresh timer for API updates
         self._refresh_timer = self.set_interval(3.0, self._auto_refresh_status)
+        # Start clock update timer
+        self._clock_timer = self.set_interval(1.0, self._update_clock)
+        # Initial clock update
+        self._update_clock()
+    
+    def _update_clock(self):
+        """Update the clock in the header."""
+        try:
+            header_right = self.query_one("#header-right", Static)
+            current_time = datetime.now().strftime("%H:%M:%S")
+            header_right.update(current_time)
+        except Exception:
+            pass  # Ignore if widget not found
     
     def _animate_status(self):
         """Toggle blink state and refresh table for animation effect."""
