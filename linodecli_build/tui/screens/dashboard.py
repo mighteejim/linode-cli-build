@@ -61,11 +61,18 @@ class DashboardScreen(Screen):
     
     #deployments-container {
         height: 1fr;
-        padding: 0;
+        padding: 1;
+    }
+    
+    #deployments-panel {
+        height: 1fr;
+        border: solid $primary;
+        background: $panel;
     }
     
     DataTable {
         height: 1fr;
+        background: $panel;
     }
     
     #help-text {
@@ -114,9 +121,10 @@ class DashboardScreen(Screen):
                 id="header-right"
             )
         
-        # Deployments table
-        with ScrollableContainer(id="deployments-container"):
-            yield DataTable()
+        # Deployments table with border
+        with Container(id="deployments-container"):
+            with Container(id="deployments-panel"):
+                yield DataTable()
         
         # Help text
         yield Static(
