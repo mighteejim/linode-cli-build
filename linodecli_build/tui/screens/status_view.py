@@ -34,67 +34,45 @@ class StatusViewScreen(Screen):
     }
     
     #header-info {
-        height: 2;
+        height: 1;
         background: $primary;
         padding: 0 1;
     }
     
     #main-content {
         height: 1fr;
-        padding: 0 1;
-    }
-    
-    #overall-status {
-        height: auto;
-        max-height: 7;
-        padding: 0 1;
-        margin-bottom: 1;
-        background: $panel;
-        border: solid $primary;
+        padding: 0;
     }
     
     #deployment-info {
-        height: auto;
-        max-height: 6;
+        height: 3;
+        padding: 0 1;
+        background: $panel;
     }
     
-    .info-row {
-        height: 1;
-    }
-    
-    .info-label {
-        width: 12;
+    .info-item {
         color: $text-muted;
     }
     
-    .info-value {
-        width: 1fr;
-    }
-    
     #panels-container {
-        height: auto;
-        max-height: 12;
-        margin-bottom: 1;
+        height: 8;
+        padding: 0;
     }
     
     #instance-container {
         width: 1fr;
+        height: 8;
         padding: 0 1;
     }
     
     #container-container {
         width: 1fr;
+        height: 8;
         padding: 0 1;
     }
     
     #logs-container {
         height: 1fr;
-        min-height: 30;
-        padding: 0 1;
-    }
-    
-    #actions-container {
-        height: 1;
         padding: 0 1;
     }
     
@@ -169,29 +147,22 @@ class StatusViewScreen(Screen):
         """Compose the status view screen."""
         yield Header(show_clock=True)
         
-        # Header info - compact
+        # Header - ultra compact
         yield Static(
-            f"[bold]{self.app_name}[/] ({self.environment})",
+            f"{self.app_name} ({self.environment})  [dim]Uptime:[/] Running",
             id="header-info"
         )
         
         # Main scrollable content
         with ScrollableContainer(id="main-content"):
-            # Deployment Information Section - compact
-            with Container(id="overall-status"):
-                with Container(id="deployment-info"):
-                    with Horizontal(classes="info-row"):
-                        yield Static("[dim]ID:[/]", classes="info-label")
-                        yield Static(self.deployment_id[:8] if self.deployment_id else "N/A", classes="info-value", id="info-appid")
-                    with Horizontal(classes="info-row"):
-                        yield Static("[dim]Plan:[/]", classes="info-label")
-                        yield Static(self.deployment_plan or "N/A", classes="info-value", id="info-plan")
-                    with Horizontal(classes="info-row"):
-                        yield Static("[dim]Region:[/]", classes="info-label")
-                        yield Static(self.deployment_region or "N/A", classes="info-value", id="info-region")
-                    with Horizontal(classes="info-row"):
-                        yield Static("[dim]Status:[/]", classes="info-label")
-                        yield Static("⟳ Loading...", classes="info-value", id="info-status")
+            # Deployment info - single line style
+            yield Static(
+                f"[dim]ID:[/] [cyan]{self.deployment_id[:8] if self.deployment_id else 'N/A'}[/]  "
+                f"[dim]Plan:[/] {self.deployment_plan or 'N/A'}  "
+                f"[dim]Region:[/] {self.deployment_region or 'N/A'}  "
+                f"[dim]Status:[/] [id=info-status]⟳ Loading...[/]",
+                id="deployment-info"
+            )
             
             # Panels container (horizontal layout)
             with Horizontal(id="panels-container"):
@@ -203,12 +174,6 @@ class StatusViewScreen(Screen):
             # Logs section - Real-time streaming
             with Container(id="logs-container"):
                 yield LogViewer(title="Build Monitor Logs")
-            
-            # Actions - compact
-            yield Static(
-                "[S] SSH  [D] Destroy  [R] Refresh  [?] Help",
-                id="actions-container"
-            )
         
         # Footer
         yield Static(
@@ -291,8 +256,16 @@ class StatusViewScreen(Screen):
                 
                 # Update overall status with animated indicator
                 status = instance.get("status", "unknown")
-                status_widget = self.query_one("#info-status", Static)
-                status_widget.update(self._get_status_indicator(status))
+                status_str = self._get_status_indicator(status)
+                
+                # Update the deployment info line
+                deployment_info = self.query_one("#deployment-info", Static)
+                deployment_info.update(
+                    f"[dim]ID:[/] [cyan]{self.deployment_id[:8] if self.deployment_id else 'N/A'}[/]  "
+                    f"[dim]Plan:[/] {self.deployment_plan or 'N/A'}  "
+                    f"[dim]Region:[/] {self.deployment_region or 'N/A'}  "
+                    f"[dim]Status:[/] {status_str}"
+                )
                 
                 # Fetch container status
                 container = await self.api_client.get_container_status(instance)

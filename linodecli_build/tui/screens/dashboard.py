@@ -36,9 +36,9 @@ class DashboardScreen(Screen):
     }
     
     #header-info {
-        height: 3;
+        height: 2;
         background: $primary;
-        padding: 1;
+        padding: 0 1;
         layout: horizontal;
     }
     
@@ -61,7 +61,7 @@ class DashboardScreen(Screen):
     
     #deployments-container {
         height: 1fr;
-        padding: 1;
+        padding: 0;
     }
     
     DataTable {
@@ -69,14 +69,15 @@ class DashboardScreen(Screen):
     }
     
     #help-text {
-        height: 5;
-        padding: 1;
+        height: 3;
+        padding: 0 1;
         background: $panel;
     }
     
     #footer-info {
         height: 1;
         background: $panel;
+        padding: 0 1;
     }
     """
     
@@ -108,7 +109,7 @@ class DashboardScreen(Screen):
                 id="header-center"
             )
             yield Static(
-                f"[dim]{current_date}[/] | [cyan]github.com/linode/linode-cli-build[/]",
+                f"{current_date} | github.com/linode/linode-cli-build",
                 classes="header-section",
                 id="header-right"
             )
@@ -119,13 +120,13 @@ class DashboardScreen(Screen):
         
         # Help text
         yield Static(
-            "↑↓ Navigate  [Enter] View Status  [D] Destroy  [R] Refresh  [Q/Esc] Quit  [?] Help",
+            "↑↓ Navigate  [Enter] View Status  [D] Destroy  [R] Refresh  [Q] Quit  [?] Help",
             id="help-text"
         )
         
         # Footer
         yield Static(
-            f"Current directory: {self.current_dir}",
+            f"Found {{count}} deployment(s) | {self.current_dir}",
             id="footer-info"
         )
         
@@ -247,7 +248,7 @@ class DashboardScreen(Screen):
         # Update footer with count
         footer = self.query_one("#footer-info", Static)
         count = len([d for d in self.deployments if d["instance_id"]])
-        footer.update(f"Found {count} deployment(s) | Current: {self.current_dir}")
+        footer.update(f"Found {count} deployment(s) | {self.current_dir}")
     
     def action_refresh(self):
         """Refresh the deployments list."""
