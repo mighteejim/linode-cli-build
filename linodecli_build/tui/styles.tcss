@@ -1,0 +1,210 @@
+/* Textual CSS styling for linode-cli build TUI */
+
+/* Global Styles */
+Screen {
+    background: $surface;
+    layers: base overlay;
+}
+
+/* Header */
+Header {
+    background: $primary;
+    color: $text;
+    height: 3;
+    dock: top;
+}
+
+/* Footer */
+Footer {
+    background: $panel;
+    color: $text-muted;
+    height: 1;
+    dock: bottom;
+}
+
+/* Containers */
+Container {
+    background: $surface;
+}
+
+Vertical {
+    background: $surface;
+}
+
+Horizontal {
+    background: $surface;
+    height: auto;
+}
+
+/* Panels */
+InstancePanel {
+    border: solid $primary;
+    background: $panel;
+    padding: 1;
+    margin: 1;
+    height: auto;
+}
+
+ContainerPanel {
+    border: solid $secondary;
+    background: $panel;
+    padding: 1;
+    margin: 1;
+    height: auto;
+}
+
+/* Log Viewer */
+LogViewer {
+    border: solid $accent;
+    background: $surface;
+    height: 15;
+    margin: 1;
+}
+
+LogViewer RichLog {
+    background: $surface;
+    border: none;
+    padding: 1;
+}
+
+/* Progress Widget */
+DeploymentProgress {
+    background: $panel;
+    padding: 1;
+    margin: 1;
+    height: auto;
+}
+
+#progress-bar {
+    height: 3;
+    padding: 1;
+    background: $panel;
+}
+
+#stage-list {
+    height: auto;
+    padding: 1;
+    background: $panel;
+}
+
+/* Status Indicators */
+.status-running {
+    color: $success;
+}
+
+.status-provisioning {
+    color: $warning;
+}
+
+.status-error {
+    color: $error;
+}
+
+.status-stopped {
+    color: $text-muted;
+}
+
+/* Progress States */
+.progress-complete {
+    color: $success;
+}
+
+.progress-active {
+    color: $warning;
+}
+
+.progress-pending {
+    color: $text-muted;
+}
+
+.progress-failed {
+    color: $error;
+}
+
+/* Info Sections */
+#header-info {
+    height: 3;
+    background: $primary;
+    color: $text;
+    padding: 1;
+    text-style: bold;
+}
+
+#overall-status {
+    height: 3;
+    padding: 1;
+    text-style: bold;
+    background: $panel;
+}
+
+#actions-container {
+    height: 3;
+    padding: 1;
+    background: $panel;
+    color: $text-muted;
+}
+
+#footer-info {
+    height: 1;
+    background: $panel;
+    color: $text-muted;
+    padding: 0 1;
+}
+
+/* Layout Containers */
+#progress-container {
+    height: auto;
+    padding: 1;
+}
+
+#instance-container {
+    width: 1fr;
+    padding: 1;
+}
+
+#container-container {
+    width: 1fr;
+    padding: 1;
+}
+
+#logs-container {
+    height: 15;
+    padding: 1;
+}
+
+#panels-container {
+    height: auto;
+}
+
+/* Static Text */
+Static {
+    background: transparent;
+}
+
+/* Notifications */
+Toast {
+    background: $panel;
+    border: solid $primary;
+    padding: 1;
+}
+
+/* Loading Indicators */
+LoadingIndicator {
+    color: $warning;
+}
+
+/* Scrollable containers - Textual handles scrollbars automatically */
+ScrollableContainer {
+    scrollbar-background: $panel;
+    scrollbar-color: $primary;
+}
+
+/* Focus styling - applied to focusable widgets */
+Button:focus, Input:focus {
+    border: solid $accent;
+}
+
+/* Hover styling - applied to interactive widgets */
+Button:hover {
+    background: $boost;
+}

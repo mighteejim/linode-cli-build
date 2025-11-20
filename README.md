@@ -89,6 +89,67 @@ That's it! Your LLM API is now running on Linode with GPU support.
 | `linode-cli build status` | 📊 Check deployment status |
 | `linode-cli build destroy` | 💣 Tear down deployment |
 
+### Interactive TUI (Terminal UI)
+
+| Command | Description |
+|---------|-------------|
+| `linode-cli build tui` | 📊 Launch dashboard (default view) |
+| `linode-cli build tui deploy` | 📺 Monitor deployment progress in real-time |
+| `linode-cli build tui status` | 🖥️ View live status dashboard |
+
+---
+
+## 📺 Interactive TUI
+
+Monitor deployments in real-time with the interactive Terminal User Interface:
+
+```bash
+# Launch the dashboard (shows all deployments)
+linode-cli build tui
+
+# Monitor deployment progress with live updates
+cd my-project
+linode-cli build tui deploy
+
+# View live status dashboard
+linode-cli build tui status --app my-app
+```
+
+### TUI Features
+
+- 📊 **Dashboard** - Central view of all your deployments
+  - Lists all deployments in current directory
+  - Shows instance IDs and status at a glance
+  - Navigate with arrow keys, select with Enter
+  - Auto-discovers deployments in subdirectories
+
+- 🎬 **Live Deployment Monitor** - Watch deployment progress in real-time
+  - Progress bar with stage tracking
+  - Live cloud-init output streaming
+  - Instance details and status
+  - Elapsed time tracking
+
+- 📊 **Status Dashboard** - Monitor your deployed applications
+  - Real-time instance and container status
+  - Auto-refresh every 5 seconds
+  - Health check monitoring
+  - Recent activity logs
+  - Quick actions (SSH, Destroy)
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `↑↓` / `j/k` | Navigate (dashboard) |
+| `Enter` | Select deployment (dashboard) |
+| `Esc` / `Ctrl+C` | Exit |
+| `R` | Refresh |
+| `S` | Show SSH command (status view) |
+| `D` | Destroy deployment (status view) |
+| `?` | Show help |
+
+The TUI provides a much richer monitoring experience compared to the CLI, perfect for watching long-running deployments or keeping an eye on production services.
+
 ---
 
 ## 🎨 Available Templates

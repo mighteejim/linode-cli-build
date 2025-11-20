@@ -28,6 +28,7 @@ def generate_cloud_init(config: CloudInitConfig) -> str:
     """Render a cloud-init YAML payload for provisioning the Linode.
     
     Uses CapabilityManager to assemble cloud-init configuration.
+    BuildWatch monitoring is added via capability_manager.add_buildwatch().
     """
     
     # Get capability fragments from the capability manager
@@ -49,7 +50,7 @@ def generate_cloud_init(config: CloudInitConfig) -> str:
         },
     ]
     
-    # Add capability write_files
+    # Add capability write_files (includes BuildWatch if added)
     write_files.extend(cap_fragments.write_files)
     
     # Add custom files
@@ -76,7 +77,7 @@ def generate_cloud_init(config: CloudInitConfig) -> str:
             f"apt-get install -y -qq {packages_str} || true",
         ])
     
-    # Then run capability commands
+    # Then run capability commands (includes BuildWatch setup if added)
     runcmd.extend(cap_fragments.runcmd)
     
     # Run custom setup script if provided

@@ -1,5 +1,5 @@
 """Command registration helpers for the ai plugin."""
 
-from . import base
+from . import base, tui
 
-__all__ = ["base"]
+__all__ = ["base", "tui"]

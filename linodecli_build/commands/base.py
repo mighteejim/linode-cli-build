@@ -9,6 +9,7 @@ from . import destroy as destroy_cmd
 from . import init as init_cmd
 from . import status as status_cmd
 from . import templates
+from . import tui
 
 
 def register_build_plugin(subparsers: argparse._SubParsersAction, config) -> None:
@@ -35,3 +36,4 @@ def _register_subcommands(subparsers: argparse._SubParsersAction, config) -> Non
     deploy_cmd.register(subparsers, config)
     status_cmd.register(subparsers, config)
     destroy_cmd.register(subparsers, config)
+    tui.register(subparsers, config)

@@ -16,6 +16,7 @@ classifiers = [
 ]
 dependencies = [
     "PyYAML>=6.0",
+    "textual>=0.47.0",
 ]
 
 [project.optional-dependencies]
@@ -32,4 +33,4 @@ include = ["linodecli_build*"]
 include-package-data = true
 
 [tool.setuptools.package-data]
-"linodecli_build" = ["templates/**/*.yml"]
+"linodecli_build" = ["templates/**/*.yml", "tui/**/*.tcss"]

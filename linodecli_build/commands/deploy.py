@@ -22,6 +22,7 @@ from ..core import colors
 from ..core import env as env_core
 from ..core import registry
 from ..core import templates as template_core
+from ..core.deployment_tracker import DeploymentTracker
 
 
 def register(subparsers: argparse._SubParsersAction, config) -> None:
@@ -120,8 +121,14 @@ def _cmd_deploy(args, config) -> None:
     internal_port = int(container_cfg.get("internal_port") or 8000)
     external_port = int(container_cfg.get("external_port") or 80)
 
+    # Generate deployment_id before creating cloud-init config
+    deployment_id = _generate_deployment_id()
+
     # Create capability manager from template
     capability_manager = capabilities.create_capability_manager(template.data)
+    
+    # Add BuildWatch monitoring capability
+    capability_manager.add_buildwatch(deployment_id, app_name)
     
     # Get custom setup from template
     setup_cfg = template.data.get("setup", {})
@@ -155,10 +162,11 @@ def _cmd_deploy(args, config) -> None:
     # Use native CLI client
     client = config.client
     root_pass, password_file = _determine_root_password(args.root_pass)
-    deployment_id = str(uuid.uuid4())
     timestamp = dt.datetime.utcnow().strftime("%m%d%H%M")
     label = _build_label(app_name, env_name, timestamp)
     tags = _build_tags(app_name, env_name, template, deployment_id)
+    
+    print(f"Deployment ID: {colors.value(deployment_id)}")
 
     base_image = (
         args.image
@@ -195,6 +203,22 @@ def _cmd_deploy(args, config) -> None:
     linode_id = instance.get('id')
     ipv4 = _primary_ipv4(instance)
     hostname = _derive_hostname(ipv4)
+    
+    # Save metadata using DeploymentTracker
+    tracker = DeploymentTracker(client)
+    health_cfg = container_cfg.get("health")
+    metadata = {
+        "deployment_id": deployment_id,
+        "app_name": app_name,
+        "env": env_name,
+        "created_at": dt.datetime.utcnow().isoformat(),
+        "created_from": str(Path.cwd()),
+        "health_config": health_cfg,
+        "hostname": hostname,
+        "external_port": external_port,
+        "internal_port": internal_port,
+    }
+    tracker.save_metadata(linode_id, metadata)
 
     record = {
         "deployment_id": deployment_id,
@@ -215,6 +239,29 @@ def _cmd_deploy(args, config) -> None:
         "last_status": instance.get('status', 'provisioning'),
     }
     registry.add_deployment(record)
+    
+    # Save state for TUI access
+    state_dir = Path.cwd() / ".linode"
+    state_dir.mkdir(exist_ok=True)
+    state_file = state_dir / "state.json"
+    
+    import json
+    state_data = {
+        "instance_id": linode_id,
+        "app_name": app_name,
+        "environment": env_name,
+        "deployment_id": deployment_id,
+        "created": dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "ipv4": ipv4,
+        "hostname": hostname,
+        "region": region,
+        "linode_type": linode_type,
+    }
+    
+    with open(state_file, 'w') as f:
+        json.dump(state_data, f, indent=2)
+    
+    print(colors.dim(f"State saved to: {state_file}"))
 
     if args.wait:
         print(colors.info("Waiting for Linode to reach running state..."))
@@ -223,7 +270,7 @@ def _cmd_deploy(args, config) -> None:
         registry.update_fields(deployment_id, {"last_status": record["last_status"]})
         print(colors.success(
             "✓ Linode is running. Container start-up can take several minutes; "
-            "run `linode-cli build status` to monitor health."
+            "run `linode-cli build status` or `linode-cli build tui status` to monitor health."
         ))
 
     print("")
@@ -319,11 +366,10 @@ def _build_tag(prefix: str, value: str) -> str:
 def _build_tags(app_name: str, env_name: str, template, deployment_id: str):
     """Build tags ensuring each doesn't exceed 50 characters."""
     return [
+        _build_tag("build-id", deployment_id),  # PRIMARY: Unique deployment ID
         _build_tag("build-app", app_name),
         _build_tag("build-env", env_name),
         _build_tag("build-tmpl", template.name),
-        _build_tag("build-tver", template.version),
-        _build_tag("build-deploy", deployment_id[:8]),  # Use shorter deployment ID
     ]
 
 
@@ -383,6 +429,17 @@ fi
     
     connect_script.write_text(script_content, encoding="utf-8")
     connect_script.chmod(0o755)  # Make executable
+
+
+def _generate_deployment_id() -> str:
+    """
+    Generate unique deployment ID.
+    
+    8 chars, alphanumeric (lowercase for readability).
+    36^8 = 2.8 trillion possible combinations.
+    """
+    alphabet = string.ascii_lowercase + string.digits  # a-z, 0-9
+    return ''.join(secrets.choice(alphabet) for _ in range(8))
 
 
 def _generate_root_password(length: int = 24) -> str:
