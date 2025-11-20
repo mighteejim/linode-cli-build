@@ -36,7 +36,7 @@ class DashboardScreen(Screen):
     }
     
     #header-info {
-        height: 2;
+        height: 1;
         background: $primary;
         padding: 0 1;
         layout: horizontal;
@@ -106,19 +106,19 @@ class DashboardScreen(Screen):
         
         with Horizontal(id="header-info"):
             yield Static(
-                f"[bold cyan]build-tui[/] [dim]v{PLUGIN_VERSION}[/]",
-                classes="header-section",
-                id="header-left"
+                f"v{PLUGIN_VERSION}",
+                id="header-left",
+                classes="header-section"
             )
             yield Static(
-                "[bold]🚀 Linode Build - Deployments Dashboard[/]",
-                classes="header-section",
-                id="header-center"
+                "🚀 Linode Build - Deployments",
+                id="header-center",
+                classes="header-section"
             )
             yield Static(
-                f"{current_date} | github.com/linode/linode-cli-build",
-                classes="header-section",
-                id="header-right"
+                f"{current_date}",
+                id="header-right",
+                classes="header-section"
             )
         
         # Deployments table with border
