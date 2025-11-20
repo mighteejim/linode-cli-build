@@ -1,41 +1,36 @@
 # BuildWatch Quick Reference
 
-## 🎯 **TL;DR**
+> **Note:** BuildWatch is now **optional**. Add to your template explicitly.
 
-BuildWatch is **automatically enabled** on all deployments. No template config needed!
-
-## 📝 **Template Configuration**
+## Enable BuildWatch
 
 ```yaml
-# Nothing special needed! Just deploy normally:
 capabilities:
-  runtime: docker    # BuildWatch monitors Docker automatically
+  runtime: docker
+  features:
+    - buildwatch
 ```
 
-## 🖥️ **Accessing BuildWatch**
-
-### Option 1: TUI (Interactive Dashboard)
-```bash
-linode-cli build tui <deployment-id>
-```
-→ Live events, issues, and recommendations
-
-### Option 2: CLI (Terminal Output)
-```bash
-linode-cli build status --verbose
-```
-→ Recent events and detected issues
-
-### Option 3: HTTP API (Programmatic)
-```bash
-curl http://<instance-ip>:9090/events?limit=20
-curl http://<instance-ip>:9090/issues
-curl http://<instance-ip>:9090/logs?container=app&lines=100
-curl http://<instance-ip>:9090/status
-curl http://<instance-ip>:9090/health
+Or with config:
+```yaml
+features:
+  - name: buildwatch
+    config:
+      port: 9090
+      log_retention_days: 7
+      enable_metrics: true
 ```
 
-## 📊 **API Endpoints**
+## Access Methods
+
+| Method | Command |
+|--------|---------|
+| **TUI** | `linode-cli build tui` |
+| **CLI** | `linode-cli build status --verbose` |
+| **API** | `curl http://<ip>:9090/events` |
+| **SSH** | `tail -f /var/log/build-watcher/events.log` |
+
+## API Endpoints
 
 | Endpoint | Description |
 |----------|-------------|
@@ -44,9 +39,8 @@ curl http://<instance-ip>:9090/health
 | `/events?limit=N` | Recent container events |
 | `/issues` | Detected problems |
 | `/logs?container=X&lines=N` | Container logs |
-| `/container?name=X` | Container details |
 
-## 🚨 **Issue Detection**
+## Issue Detection
 
 | Issue | Detection | Severity |
 |-------|-----------|----------|
@@ -54,7 +48,7 @@ curl http://<instance-ip>:9090/health
 | Restart Loop | 3+ restarts in 5 min | 🟡 Warning |
 | Health Failure | Unhealthy status | 🟡 Warning |
 
-## 📁 **Log Files on Instance**
+## Log Files
 
 ```
 /var/log/build-watcher/
@@ -64,28 +58,19 @@ curl http://<instance-ip>:9090/health
 └── errors.log      # Detected issues
 ```
 
-## 🔧 **Service Management**
+## Service Management
 
 ```bash
-# Status
 systemctl status build-watcher
-
-# Logs
 journalctl -u build-watcher -f
-
-# Restart
 systemctl restart build-watcher
 ```
 
-## 💡 **Key Features**
+## When to Use
 
-✅ Zero configuration required  
-✅ Real-time event monitoring  
-✅ Automatic issue detection  
-✅ Multiple access methods  
-✅ Persistent logs (7-day rotation)  
-✅ Lightweight & reliable  
+✅ GPU workloads, production, long-running services  
+❌ Simple tests, minimal resource needs
 
-## 📚 **Full Documentation**
+## Full Documentation
 
-See `docs/buildwatch-usage.md` for detailed usage guide.
+See **[Capabilities Reference](capabilities.md#buildwatch-container-monitoring)** for complete documentation.
