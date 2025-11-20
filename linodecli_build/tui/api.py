@@ -118,7 +118,7 @@ class LinodeAPIClient:
         )
         
         # Cache successful responses
-        if status == 0 and use_cache:
+        if status == 200 and use_cache:
             self.cache.set(cache_key, (status, response))
         
         return status, response
@@ -136,7 +136,7 @@ class LinodeAPIClient:
         try:
             # Don't use cache for instance data in status view to ensure fresh status
             status, response = await self._call_api('linodes', 'view', [str(instance_id)], use_cache=False)
-            if status == 0:
+            if status == 200:
                 return response
             else:
                 # API returned error status
@@ -173,8 +173,13 @@ class LinodeAPIClient:
         """
         try:
             status, response = await self._call_api('linodes', 'list', [], use_cache=True)
-            if status == 0 and isinstance(response, list):
-                return response
+            # CLI returns 200 for success, response is a dict with 'data' key
+            if status == 200:
+                # Response is {'data': [...], 'page': 1, 'pages': 1, 'results': N}
+                if isinstance(response, dict) and 'data' in response:
+                    return response['data']
+                elif isinstance(response, list):
+                    return response
         except Exception as e:
             print(f"Error listing instances: {e}")
         return []

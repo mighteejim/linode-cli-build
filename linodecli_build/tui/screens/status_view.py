@@ -16,6 +16,9 @@ from ..utils import format_elapsed_time, format_uptime
 class StatusViewScreen(Screen):
     """Screen for viewing live status of deployed applications."""
     
+    # Animation state for blinking indicators (shared with dashboard)
+    _blink_state = False
+    
     BINDINGS = [
         Binding("escape", "back", "Back"),
         Binding("r", "refresh", "Refresh"),
@@ -42,6 +45,7 @@ class StatusViewScreen(Screen):
     
     #overall-status {
         height: auto;
+        max-height: 10;
         padding: 1;
         background: $panel;
         border: solid $primary;
@@ -49,6 +53,7 @@ class StatusViewScreen(Screen):
     
     #deployment-info {
         height: auto;
+        max-height: 8;
     }
     
     .info-row {
@@ -66,6 +71,7 @@ class StatusViewScreen(Screen):
     
     #panels-container {
         height: auto;
+        max-height: 15;
     }
     
     #instance-container {
@@ -79,8 +85,10 @@ class StatusViewScreen(Screen):
     }
     
     #logs-container {
-        height: 4;
+        height: 1fr;
+        min-height: 25;
         padding: 0 1;
+        margin-top: 1;
     }
     
     #actions-container {
@@ -95,6 +103,7 @@ class StatusViewScreen(Screen):
     
     #api-status {
         height: auto;
+        max-height: 8;
         padding: 1;
         background: $panel;
         border: solid $accent;
@@ -145,6 +154,7 @@ class StatusViewScreen(Screen):
         self.is_monitoring = True
         self.update_task = None
         self.auto_refresh = True
+        self._animation_timer = None
         # Track API call status
         self.api_status = {
             'linode_api': {'status': 'pending', 'last_code': None, 'last_error': None},
@@ -212,9 +222,9 @@ class StatusViewScreen(Screen):
                 with Container(id="container-container"):
                     yield ContainerPanel()
             
-            # Logs section
+            # Logs section - Real-time streaming
             with Container(id="logs-container"):
-                yield LogViewer(title="Recent Activity")
+                yield LogViewer(title="📜 Build Monitor Logs (Live)")
             
             # Actions
             yield Static(
@@ -235,9 +245,50 @@ class StatusViewScreen(Screen):
         # Reset scroll position to top
         self.scroll_home(animate=False)
         
+        # Start animation timer for blinking status indicators
+        self._animation_timer = self.set_interval(0.5, self._animate_status)
+        
         self.update_task = self.set_interval(3.0, self.update_status)
         # Initial update
         await self.update_status()
+    
+    def _animate_status(self):
+        """Toggle blink state for status indicators."""
+        StatusViewScreen._blink_state = not StatusViewScreen._blink_state
+        # Only refresh status if it's a transitional state
+        # This will be handled in update_status
+    
+    def _get_status_indicator(self, status: str) -> str:
+        """Get a styled status indicator with icon and color (matches dashboard)."""
+        status_lower = status.lower()
+        
+        # Status mappings with icons and colors (matching dashboard)
+        if status_lower == "running":
+            return "[bold green]● running[/]"
+        elif status_lower == "provisioning":
+            # Blinking yellow for provisioning
+            if StatusViewScreen._blink_state:
+                return "[bold yellow]◉ provisioning[/]"
+            else:
+                return "[bold yellow]◯ provisioning[/]"
+        elif status_lower == "booting":
+            # Blinking green for booting
+            if StatusViewScreen._blink_state:
+                return "[bold green]◉ booting[/]"
+            else:
+                return "[bold green]◯ booting[/]"
+        elif status_lower in ["rebooting", "migrating", "busy"]:
+            # Blinking yellow for other in-progress states
+            if StatusViewScreen._blink_state:
+                return f"[bold yellow]◉ {status_lower}[/]"
+            else:
+                return f"[bold yellow]◯ {status_lower}[/]"
+        elif status_lower in ["offline", "stopped"]:
+            return "[dim white]○ stopped[/]"
+        elif status_lower == "failed":
+            return "[bold red]✕ failed[/]"
+        else:
+            return f"[dim]? {status}[/]"
     
     async def update_status(self):
         """Update status from API."""
@@ -261,22 +312,10 @@ class StatusViewScreen(Screen):
                 ipv4 = instance.get("ipv4", [])
                 ipv4_addr = ipv4[0] if ipv4 and len(ipv4) > 0 else None
                 
-                # Update overall status
+                # Update overall status with animated indicator
                 status = instance.get("status", "unknown")
                 status_widget = self.query_one("#info-status", Static)
-                
-                if status == "running":
-                    status_widget.update("[green]● Running[/]")
-                elif status == "provisioning":
-                    status_widget.update("[yellow]⟳ Provisioning[/]")
-                elif status == "booting":
-                    status_widget.update("[cyan]⟳ Booting[/]")
-                elif status == "stopped":
-                    status_widget.update("[dim]○ Stopped[/]")
-                elif status == "offline":
-                    status_widget.update("[red]⚠ Offline[/]")
-                else:
-                    status_widget.update(f"[yellow]⟳ {status.title()}[/]")
+                status_widget.update(self._get_status_indicator(status))
                 
                 # Fetch container status
                 container = await self.api_client.get_container_status(instance)
@@ -309,17 +348,20 @@ class StatusViewScreen(Screen):
                         self.api_status['build_monitor_status'] = {'status': 'error', 'last_code': 'timeout', 'last_error': 'Connection timeout'}
                         self.query_one("#api-bm-status", Static).update(f"[yellow]⚠ Timeout[/] [dim]http://{ipv4_addr}:9090/status[/]")
                     
-                    # Try to fetch logs from Build Monitor
-                    logs = await self.api_client.fetch_buildwatch_events(ipv4_addr, limit=50)
+                    # Try to fetch logs from Build Monitor (increased limit for better visibility)
+                    logs = await self.api_client.fetch_buildwatch_events(ipv4_addr, limit=100)
                     
                     if logs:
                         # Update API status - logs success
                         self.api_status['build_monitor_logs'] = {'status': 'success', 'last_code': 200, 'last_error': None}
                         self.query_one("#api-bm-logs", Static).update(f"[green]✓ 200 OK[/] [dim]({len(logs)} lines)[/]")
                         
-                        # Clear old placeholder messages
-                        if log_viewer.logs and "[dim]No logs available" in str(log_viewer.logs[0]):
-                            log_viewer.clear()
+                        # Clear logs and repopulate with fresh data (for real-time streaming)
+                        log_viewer.clear()
+                        
+                        # Add header
+                        log_viewer.add_log_line(f"[bold cyan]📡 Streaming logs from Build Monitor[/] [dim]({len(logs)} entries)[/]")
+                        log_viewer.add_log_line("")
                         
                         # Update log viewer with Build Monitor logs
                         # Each log has: timestamp, message, category, formatted
@@ -350,7 +392,7 @@ class StatusViewScreen(Screen):
                             unresolved = [i for i in issues if not i.get('resolved', False)]
                             if unresolved:
                                 log_viewer.add_log_line("")
-                                log_viewer.add_log_line("[bold]⚠ Issues Detected:[/]")
+                                log_viewer.add_log_line("[bold yellow]⚠ Issues Detected:[/]")
                                 for issue in unresolved[:5]:  # Show up to 5 issues
                                     severity = issue.get('severity', 'info')
                                     message = issue.get('message', '')
@@ -366,7 +408,7 @@ class StatusViewScreen(Screen):
                                         log_viewer.add_log_line(f"  [blue]ℹ INFO:[/] {message}")
                                     
                                     if recommendation:
-                                        log_viewer.add_log_line(f"    → {recommendation}")
+                                        log_viewer.add_log_line(f"    [dim]→ {recommendation}[/]")
                         else:
                             # No issues
                             self.api_status['build_monitor_issues'] = {'status': 'success', 'last_code': 200, 'last_error': None}
@@ -539,3 +581,5 @@ class StatusViewScreen(Screen):
         self.is_monitoring = False
         if self.update_task:
             self.update_task.stop()
+        if self._animation_timer:
+            self._animation_timer.stop()
