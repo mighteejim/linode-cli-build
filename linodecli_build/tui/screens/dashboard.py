@@ -7,7 +7,6 @@ from pathlib import Path
 from textual.screen import Screen
 from textual.containers import Container, Vertical, ScrollableContainer, Horizontal
 from textual.widgets import Header, Footer, Static, DataTable
-from textual.widgets.data_table import RowSelected
 from textual.binding import Binding
 from rich.text import Text
 
@@ -319,7 +318,7 @@ class DashboardScreen(Screen):
         except Exception as e:
             self.notify(f"Error opening status view: {e}", severity="error", timeout=5)
     
-    def on_data_table_row_selected(self, event: RowSelected) -> None:
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Handle row selection in the data table (Enter key)."""
         # Call the same logic as action_view_selected
         self.action_view_selected()
