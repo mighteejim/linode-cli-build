@@ -33,12 +33,12 @@ class ContainerPanel(Static):
         
         # Name
         name = container.get("name", "N/A")
-        text.append("Name: ", style="bold")
+        text.append("Name: ", style="dim")
         text.append(f"{name}\n")
         
         # Image
         image = container.get("image", "N/A")
-        text.append("Image: ", style="bold")
+        text.append("Image: ", style="dim")
         text.append(f"{image}\n")
         
         # Status
@@ -49,24 +49,12 @@ class ContainerPanel(Static):
         text.append(status, style=color)
         text.append("\n")
         
-        # Uptime
-        uptime = container.get("uptime", "N/A")
-        if uptime != "N/A":
-            text.append("Uptime: ", style="bold")
-            text.append(f"{uptime}\n")
-        
-        # Health check
+        # Health check (more important than uptime)
         health = container.get("health", "")
         if health:
-            text.append("Health: ", style="bold")
+            text.append("Health: ", style="dim")
             health_color = "green" if "200" in health or "OK" in health else "yellow"
-            text.append(f"{health}\n", style=health_color)
-        
-        # Ports (if available)
-        ports = container.get("ports", [])
-        if ports:
-            text.append("Ports: ", style="bold")
-            text.append(f"{', '.join(ports)}\n")
+            text.append(f"{health}", style=health_color)
         
         return text
     

@@ -41,37 +41,37 @@ class InstancePanel(Static):
         
         # ID
         instance_id = instance.get("id", "N/A")
-        text.append("ID: ", style="bold")
+        text.append("ID: ", style="dim")
         text.append(f"{instance_id}\n")
         
         # Region
         region = instance.get("region", "N/A")
         region_display = get_region_display_name(region)
-        text.append("Region: ", style="bold")
+        text.append("Region: ", style="dim")
         text.append(f"{region} ({region_display})\n")
         
         # Type
         instance_type = instance.get("type", "N/A")
-        text.append("Type: ", style="bold")
+        text.append("Type: ", style="dim")
         text.append(f"{instance_type}\n")
         
         # IPv4
         ipv4 = instance.get("ipv4", [])
         if ipv4 and len(ipv4) > 0:
-            text.append("IPv4: ", style="bold")
+            text.append("IPv4: ", style="dim")
             text.append(f"{ipv4[0]}\n")
         
-        # Hostname (if available)
+        # Label (only if set and different from deployment ID pattern)
         label = instance.get("label", "")
-        if label:
-            text.append("Label: ", style="bold")
+        if label and not label.startswith("build-"):
+            text.append("Label: ", style="dim")
             text.append(f"{label}\n")
         
         # Created time
         created = instance.get("created")
         if created:
-            text.append("Created: ", style="bold")
-            text.append(f"{format_timestamp(created)}\n")
+            text.append("Created: ", style="dim")
+            text.append(format_timestamp(created))
         
         return text
     

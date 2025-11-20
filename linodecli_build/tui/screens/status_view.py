@@ -55,19 +55,20 @@ class StatusViewScreen(Screen):
     }
     
     #panels-container {
-        height: 8;
+        height: auto;
+        max-height: 15;
         padding: 0;
     }
     
     #instance-container {
         width: 1fr;
-        height: 8;
+        height: auto;
         padding: 0 1;
     }
     
     #container-container {
         width: 1fr;
-        height: 8;
+        height: auto;
         padding: 0 1;
     }
     
