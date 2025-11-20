@@ -34,27 +34,28 @@ class StatusViewScreen(Screen):
     }
     
     #header-info {
-        height: 3;
+        height: 2;
         background: $primary;
-        padding: 1;
+        padding: 0 1;
     }
     
     #main-content {
         height: 1fr;
-        padding: 1;
+        padding: 0 1;
     }
     
     #overall-status {
         height: auto;
-        max-height: 10;
-        padding: 1;
+        max-height: 7;
+        padding: 0 1;
+        margin-bottom: 1;
         background: $panel;
         border: solid $primary;
     }
     
     #deployment-info {
         height: auto;
-        max-height: 8;
+        max-height: 6;
     }
     
     .info-row {
@@ -62,7 +63,7 @@ class StatusViewScreen(Screen):
     }
     
     .info-label {
-        width: 15;
+        width: 12;
         color: $text-muted;
     }
     
@@ -72,7 +73,8 @@ class StatusViewScreen(Screen):
     
     #panels-container {
         height: auto;
-        max-height: 15;
+        max-height: 12;
+        margin-bottom: 1;
     }
     
     #instance-container {
@@ -87,13 +89,12 @@ class StatusViewScreen(Screen):
     
     #logs-container {
         height: 1fr;
-        min-height: 25;
+        min-height: 30;
         padding: 0 1;
-        margin-top: 1;
     }
     
     #actions-container {
-        height: 2;
+        height: 1;
         padding: 0 1;
     }
     
@@ -168,26 +169,22 @@ class StatusViewScreen(Screen):
         """Compose the status view screen."""
         yield Header(show_clock=True)
         
-        # Header info
+        # Header info - compact
         yield Static(
-            f"Status: {self.app_name} ({self.environment})",
+            f"[bold]{self.app_name}[/] ({self.environment})",
             id="header-info"
         )
         
         # Main scrollable content
         with ScrollableContainer(id="main-content"):
-            # Deployment Information Section
+            # Deployment Information Section - compact
             with Container(id="overall-status"):
-                yield Static("[bold cyan]📊 Deployment Information[/]", id="section-title")
                 with Container(id="deployment-info"):
                     with Horizontal(classes="info-row"):
-                        yield Static("[dim]App ID:[/]", classes="info-label")
-                        yield Static(self.deployment_id or "N/A", classes="info-value", id="info-appid")
+                        yield Static("[dim]ID:[/]", classes="info-label")
+                        yield Static(self.deployment_id[:8] if self.deployment_id else "N/A", classes="info-value", id="info-appid")
                     with Horizontal(classes="info-row"):
-                        yield Static("[dim]Application:[/]", classes="info-label")
-                        yield Static(f"{self.app_name} ({self.environment})", classes="info-value", id="info-app")
-                    with Horizontal(classes="info-row"):
-                        yield Static("[dim]Plan Type:[/]", classes="info-label")
+                        yield Static("[dim]Plan:[/]", classes="info-label")
                         yield Static(self.deployment_plan or "N/A", classes="info-value", id="info-plan")
                     with Horizontal(classes="info-row"):
                         yield Static("[dim]Region:[/]", classes="info-label")
@@ -195,9 +192,6 @@ class StatusViewScreen(Screen):
                     with Horizontal(classes="info-row"):
                         yield Static("[dim]Status:[/]", classes="info-label")
                         yield Static("⟳ Loading...", classes="info-value", id="info-status")
-                    with Horizontal(classes="info-row"):
-                        yield Static("[dim]Directory:[/]", classes="info-label")
-                        yield Static(self.deployment_directory or "N/A", classes="info-value", id="info-directory")
             
             # Panels container (horizontal layout)
             with Horizontal(id="panels-container"):
@@ -208,11 +202,11 @@ class StatusViewScreen(Screen):
             
             # Logs section - Real-time streaming
             with Container(id="logs-container"):
-                yield LogViewer(title="📜 Build Monitor Logs (Live)")
+                yield LogViewer(title="Build Monitor Logs")
             
-            # Actions
+            # Actions - compact
             yield Static(
-                "Quick Actions: [S] SSH  [D] Destroy  [R] Refresh  [?] Help",
+                "[S] SSH  [D] Destroy  [R] Refresh  [?] Help",
                 id="actions-container"
             )
         
