@@ -41,8 +41,27 @@ class StatusViewScreen(Screen):
     }
     
     #overall-status {
-        height: 2;
-        padding: 0 1;
+        height: auto;
+        padding: 1;
+        background: $panel;
+        border: solid $primary;
+    }
+    
+    #deployment-info {
+        height: auto;
+    }
+    
+    .info-row {
+        height: 1;
+    }
+    
+    .info-label {
+        width: 15;
+        color: $text-muted;
+    }
+    
+    .info-value {
+        width: 1fr;
     }
     
     #panels-container {
@@ -81,6 +100,10 @@ class StatusViewScreen(Screen):
         instance_id: int,
         app_name: str = "app",
         environment: str = "production",
+        deployment_id: str = None,
+        region: str = None,
+        plan: str = None,
+        directory: str = None,
         *args,
         **kwargs
     ):
@@ -89,6 +112,10 @@ class StatusViewScreen(Screen):
         self.instance_id = instance_id
         self.app_name = app_name
         self.environment = environment
+        self.deployment_id = deployment_id
+        self.region = region
+        self.plan = plan
+        self.directory = directory
         self.last_update = time.time()
         self.is_monitoring = True
         self.update_task = None
@@ -106,11 +133,28 @@ class StatusViewScreen(Screen):
         
         # Main scrollable content
         with ScrollableContainer(id="main-content"):
-            # Overall status
-            yield Static(
-                "Overall: ✓ Healthy",
-                id="overall-status"
-            )
+            # Deployment Information Section
+            with Container(id="overall-status"):
+                yield Static("[bold cyan]📊 Deployment Information[/]", id="section-title")
+                with Container(id="deployment-info"):
+                    with Horizontal(classes="info-row"):
+                        yield Static("[dim]App ID:[/]", classes="info-label")
+                        yield Static(self.deployment_id or "N/A", classes="info-value", id="info-appid")
+                    with Horizontal(classes="info-row"):
+                        yield Static("[dim]Application:[/]", classes="info-label")
+                        yield Static(f"{self.app_name} ({self.environment})", classes="info-value", id="info-app")
+                    with Horizontal(classes="info-row"):
+                        yield Static("[dim]Plan Type:[/]", classes="info-label")
+                        yield Static(self.plan or "N/A", classes="info-value", id="info-plan")
+                    with Horizontal(classes="info-row"):
+                        yield Static("[dim]Region:[/]", classes="info-label")
+                        yield Static(self.region or "N/A", classes="info-value", id="info-region")
+                    with Horizontal(classes="info-row"):
+                        yield Static("[dim]Status:[/]", classes="info-label")
+                        yield Static("⟳ Loading...", classes="info-value", id="info-status")
+                    with Horizontal(classes="info-row"):
+                        yield Static("[dim]Directory:[/]", classes="info-label")
+                        yield Static(self.directory or "N/A", classes="info-value", id="info-directory")
             
             # Panels container (horizontal layout)
             with Horizontal(id="panels-container"):
@@ -166,24 +210,20 @@ class StatusViewScreen(Screen):
                 
                 # Update overall status
                 status = instance.get("status", "unknown")
-                overall_status = self.query_one("#overall-status", Static)
+                status_widget = self.query_one("#info-status", Static)
                 
                 if status == "running":
-                    overall_status.update(
-                        Text("Overall: ✓ Healthy", style="green bold")
-                    )
-                elif status == "booting":
-                    overall_status.update(
-                        Text("Overall: ⟳ Booting", style="cyan bold")
-                    )
+                    status_widget.update("[green]● Running[/]")
                 elif status == "provisioning":
-                    overall_status.update(
-                        Text("Overall: ⟳ Provisioning", style="yellow bold")
-                    )
+                    status_widget.update("[yellow]⟳ Provisioning[/]")
+                elif status == "booting":
+                    status_widget.update("[cyan]⟳ Booting[/]")
+                elif status == "stopped":
+                    status_widget.update("[dim]○ Stopped[/]")
+                elif status == "offline":
+                    status_widget.update("[red]⚠ Offline[/]")
                 else:
-                    overall_status.update(
-                        Text(f"Overall: {status}", style="yellow bold")
-                    )
+                    status_widget.update(f"[yellow]⟳ {status.title()}[/]")
                 
                 # Fetch container status
                 container = await self.api_client.get_container_status(instance)

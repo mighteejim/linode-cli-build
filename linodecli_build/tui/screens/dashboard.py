@@ -282,7 +282,11 @@ class DashboardScreen(Screen):
                 self.api_client,
                 deployment["instance_id"],
                 deployment["name"],
-                deployment["environment"]
+                deployment["environment"],
+                deployment_id=deployment["deployment_id"],
+                region=deployment["region"],
+                plan=deployment["plan"],
+                directory=deployment["directory"]
             )
         )
     
