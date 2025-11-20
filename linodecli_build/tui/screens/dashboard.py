@@ -283,30 +283,40 @@ class DashboardScreen(Screen):
         
         # Get selected row
         cursor_row = table.cursor_row
-        if cursor_row >= len(self.deployments):
-            self.notify("Invalid selection", severity="warning")
+        
+        # Handle None or invalid cursor position
+        if cursor_row is None:
+            self.notify("Please select a deployment first", severity="warning")
+            return
+        
+        if cursor_row < 0 or cursor_row >= len(self.deployments):
+            self.notify(f"Invalid selection (row {cursor_row}, total {len(self.deployments)})", severity="warning")
             return
         
         deployment = self.deployments[cursor_row]
         
-        if not deployment["instance_id"]:
+        if not deployment.get("instance_id"):
             self.notify("No instance ID found for this deployment", severity="warning")
             return
         
         # Switch to status view
         from .status_view import StatusViewScreen
-        self.app.push_screen(
-            StatusViewScreen(
-                self.api_client,
-                deployment["instance_id"],
-                deployment["name"],
-                deployment["environment"],
-                deployment_id=deployment["deployment_id"],
-                region=deployment["region"],
-                plan=deployment["plan"],
-                directory=deployment["directory"]
+        
+        try:
+            self.app.push_screen(
+                StatusViewScreen(
+                    self.api_client,
+                    deployment["instance_id"],
+                    deployment["name"],
+                    deployment["environment"],
+                    deployment_id=deployment["deployment_id"],
+                    region=deployment.get("region", "unknown"),
+                    plan=deployment.get("plan", "unknown"),
+                    directory=deployment.get("directory", "")
+                )
             )
-        )
+        except Exception as e:
+            self.notify(f"Error opening status view: {e}", severity="error", timeout=5)
     
     def action_destroy_selected(self):
         """Destroy the selected deployment with confirmation."""
