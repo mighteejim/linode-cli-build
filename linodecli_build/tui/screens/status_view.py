@@ -390,11 +390,18 @@ class StatusViewScreen(Screen):
                     if not log_viewer.logs:
                         log_viewer.add_log_line("[dim]No logs available yet. Logs will appear here as they're generated.[/]")
             else:
-                # Linode API failed
+                # Linode API failed - but update status widget to show we're retrying
                 self.api_status['linode_api'] = {'status': 'error', 'last_code': 'error', 'last_error': 'Failed to fetch instance'}
-                self.query_one("#api-linode", Static).update(f"[red]✕ Failed[/] [dim]Instance {self.instance_id}[/]")
+                self.query_one("#api-linode", Static).update(f"[red]✕ Failed[/] [dim]Instance {self.instance_id} - retrying...[/]")
+                
+                # Keep the status as "⟳ Connecting..." instead of showing stale data
+                status_widget = self.query_one("#info-status", Static)
+                status_widget.update("[yellow]⟳ Connecting to API...[/]")
         
         except Exception as e:
+            # Show the actual exception in the UI
+            self.api_status['linode_api'] = {'status': 'error', 'last_code': 'exception', 'last_error': str(e)}
+            self.query_one("#api-linode", Static).update(f"[red]✕ Error[/] [dim]{str(e)[:50]}[/]")
             self.notify(f"Error updating status: {e}", severity="error")
     
     def update_footer(self):

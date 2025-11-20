@@ -134,11 +134,16 @@ class LinodeAPIClient:
             Instance data dictionary or None on error
         """
         try:
-            status, response = await self._call_api('linodes', 'view', [str(instance_id)])
+            # Don't use cache for instance data in status view to ensure fresh status
+            status, response = await self._call_api('linodes', 'view', [str(instance_id)], use_cache=False)
             if status == 0:
                 return response
+            else:
+                # API returned error status
+                error_msg = response.get('error', 'Unknown error') if isinstance(response, dict) else str(response)
+                print(f"Error fetching instance {instance_id}: status={status}, error={error_msg}")
         except Exception as e:
-            print(f"Error fetching instance {instance_id}: {e}")
+            print(f"Exception fetching instance {instance_id}: {e}")
         return None
     
     async def get_instance_logs(self, instance_id: int, lines: int = 50) -> Optional[str]:
