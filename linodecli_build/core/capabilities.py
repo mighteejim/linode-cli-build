@@ -293,6 +293,138 @@ class CustomPackagesCapability(Capability):
         return fragments
 
 
+class BuildWatchCapability(Capability):
+    """Provides BuildWatch container monitoring service.
+    
+    BuildWatch monitors Docker events in real-time, detects issues,
+    and provides an HTTP API for status and logs.
+    
+    The service script is downloaded from GitHub to avoid exceeding
+    cloud-init's 16KB metadata limit.
+    """
+    
+    # GitHub raw URL for build-watcher.py script
+    # TODO: Update to 'main' branch once merged
+    SCRIPT_URL = "https://raw.githubusercontent.com/linode/linode-cli-ai/tui/build-watcher.py"
+    
+    def __init__(self, deployment_id: str, app_name: str):
+        """Initialize BuildWatch capability.
+        
+        Args:
+            deployment_id: Unique deployment identifier
+            app_name: Application name
+        """
+        self.deployment_id = deployment_id
+        self.app_name = app_name
+    
+    def name(self) -> str:
+        return "buildwatch"
+    
+    def get_fragments(self) -> CapabilityFragments:
+        fragments = CapabilityFragments()
+        
+        # Write systemd unit and logrotate config (small files - inline is OK)
+        # Note: BuildWatch runs completely independently - no Docker dependencies in systemd
+        systemd_unit = f"""[Unit]
+Description=BuildWatch - Container Monitoring Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/build-watcher
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+Environment="BUILD_DEPLOYMENT_ID={self.deployment_id}"
+Environment="BUILD_APP_NAME={self.app_name}"
+
+# Don't restart on success - only on actual failures
+StartLimitBurst=5
+StartLimitIntervalSec=300
+
+[Install]
+WantedBy=multi-user.target
+"""
+        
+        logrotate_config = """/var/log/build-watcher/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 root root
+}
+"""
+        
+        fragments.write_files.extend([
+            {
+                "path": "/etc/systemd/system/build-watcher.service",
+                "permissions": "0644",
+                "owner": "root:root",
+                "content": systemd_unit,
+            },
+            {
+                "path": "/etc/logrotate.d/build-watcher",
+                "permissions": "0644",
+                "owner": "root:root",
+                "content": logrotate_config,
+            },
+        ])
+        
+        # Download and setup BuildWatch service
+        fragments.runcmd.extend([
+            "# Create BuildWatch directories",
+            "mkdir -p /var/log/build-watcher",
+            "mkdir -p /var/lib/build-watcher",
+            "",
+            "# Download BuildWatch service script from GitHub with retry",
+            "echo 'Downloading BuildWatch service...'",
+            "for i in 1 2 3 4 5; do",
+            f"  if curl -fsSL --connect-timeout 10 --max-time 30 {self.SCRIPT_URL} -o /usr/local/bin/build-watcher; then",
+            "    echo 'BuildWatch script downloaded successfully'",
+            "    break",
+            "  else",
+            "    echo \"Attempt $i/5: Failed to download BuildWatch script, retrying...\"",
+            "    sleep 5",
+            "  fi",
+            "done",
+            "",
+            "# Verify the script was downloaded",
+            "if [ ! -f /usr/local/bin/build-watcher ]; then",
+            "  echo 'ERROR: BuildWatch script not found after download attempts' >&2",
+            "  echo 'BuildWatch will not be available for this deployment' >&2",
+            "  exit 0  # Don't fail cloud-init, just skip BuildWatch",
+            "fi",
+            "",
+            "# Make script executable and verify it's valid Python",
+            "chmod +x /usr/local/bin/build-watcher",
+            "if ! head -1 /usr/local/bin/build-watcher | grep -q python; then",
+            "  echo 'ERROR: Downloaded file does not appear to be a Python script' >&2",
+            "  rm -f /usr/local/bin/build-watcher",
+            "  exit 0  # Don't fail cloud-init",
+            "fi",
+            "",
+            "# Enable and start BuildWatch service",
+            "systemctl daemon-reload",
+            "systemctl enable build-watcher",
+            "systemctl start build-watcher",
+            "sleep 2",
+            "",
+            "# Verify service started",
+            "if systemctl is-active --quiet build-watcher; then",
+            "  echo '✓ BuildWatch monitoring started successfully'",
+            "else",
+            "  echo '✗ BuildWatch failed to start' >&2",
+            "  journalctl -u build-watcher -n 20 --no-pager",
+            "fi",
+        ])
+        
+        return fragments
+
+
 class CapabilityManager:
     """Manages capabilities and assembles cloud-init components."""
     
@@ -367,6 +499,19 @@ class CapabilityManager:
                 )
         
         self.capabilities.append(capability)
+    
+    def add_buildwatch(self, deployment_id: str, app_name: str) -> None:
+        """Add BuildWatch monitoring capability.
+        
+        BuildWatch is always added FIRST so it can start monitoring immediately.
+        
+        Args:
+            deployment_id: Unique deployment identifier
+            app_name: Application name
+        """
+        buildwatch_cap = BuildWatchCapability(deployment_id, app_name)
+        # Insert at the beginning so it runs first
+        self.capabilities.insert(0, buildwatch_cap)
     
     def assemble_fragments(self) -> CapabilityFragments:
         """Assemble all capability fragments into a single set.
