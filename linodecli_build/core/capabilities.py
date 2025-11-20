@@ -305,7 +305,7 @@ class BuildWatchCapability(Capability):
     
     # GitHub raw URL for build-watcher.py script
     # TODO: Update to 'main' branch once merged
-    SCRIPT_URL = "https://raw.githubusercontent.com/mighteejim/linode-cli-build/tui/build-watcher.py"
+    SCRIPT_URL = "https://raw.githubusercontent.com/mighteejim/linode-cli-build/tui/scripts/build-watcher.py"
     
     def __init__(self, deployment_id: str, app_name: str):
         """Initialize BuildWatch capability.
