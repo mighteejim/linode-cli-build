@@ -24,6 +24,7 @@ class StatusViewScreen(Screen):
         Binding("r", "refresh", "Refresh"),
         Binding("s", "ssh", "SSH"),
         Binding("d", "destroy", "Destroy"),
+        Binding("?", "help", "Help"),
         Binding("ctrl+c", "quit", "Quit"),
     ]
     
@@ -198,23 +199,6 @@ class StatusViewScreen(Screen):
                         yield Static("[dim]Directory:[/]", classes="info-label")
                         yield Static(self.deployment_directory or "N/A", classes="info-value", id="info-directory")
             
-            # API Status Section
-            with Container(id="api-status"):
-                yield Static("[bold cyan]🔌 API Status[/]", id="api-status-title")
-                with Container(id="api-status-grid"):
-                    with Horizontal(classes="api-status-row"):
-                        yield Static("[dim]Linode API (instance data):[/]", classes="api-endpoint")
-                        yield Static("⟳ Connecting...", classes="api-status-indicator", id="api-linode")
-                    with Horizontal(classes="api-status-row"):
-                        yield Static("[dim]Build Monitor /status:[/]", classes="api-endpoint")
-                        yield Static("⟳ Connecting...", classes="api-status-indicator", id="api-bm-status")
-                    with Horizontal(classes="api-status-row"):
-                        yield Static("[dim]Build Monitor /logs:[/]", classes="api-endpoint")
-                        yield Static("⟳ Connecting...", classes="api-status-indicator", id="api-bm-logs")
-                    with Horizontal(classes="api-status-row"):
-                        yield Static("[dim]Build Monitor /issues:[/]", classes="api-endpoint")
-                        yield Static("⟳ Connecting...", classes="api-status-indicator", id="api-bm-issues")
-            
             # Panels container (horizontal layout)
             with Horizontal(id="panels-container"):
                 with Container(id="instance-container"):
@@ -228,7 +212,7 @@ class StatusViewScreen(Screen):
             
             # Actions
             yield Static(
-                "Quick Actions: [S] SSH  [D] Destroy  [R] Refresh",
+                "Quick Actions: [S] SSH  [D] Destroy  [R] Refresh  [?] Help",
                 id="actions-container"
             )
         
@@ -302,7 +286,6 @@ class StatusViewScreen(Screen):
             if instance:
                 # Update API status - Linode API success
                 self.api_status['linode_api'] = {'status': 'success', 'last_code': 200, 'last_error': None}
-                self.query_one("#api-linode", Static).update("[green]✓ 200 OK[/]")
                 
                 # Update instance panel
                 instance_panel = self.query_one(InstancePanel)
@@ -343,10 +326,8 @@ class StatusViewScreen(Screen):
                     bm_status = await self.api_client.fetch_buildwatch_status(ipv4_addr)
                     if bm_status:
                         self.api_status['build_monitor_status'] = {'status': 'success', 'last_code': 200, 'last_error': None}
-                        self.query_one("#api-bm-status", Static).update(f"[green]✓ 200 OK[/] [dim]http://{ipv4_addr}:9090/status[/]")
                     else:
                         self.api_status['build_monitor_status'] = {'status': 'error', 'last_code': 'timeout', 'last_error': 'Connection timeout'}
-                        self.query_one("#api-bm-status", Static).update(f"[yellow]⚠ Timeout[/] [dim]http://{ipv4_addr}:9090/status[/]")
                     
                     # Try to fetch logs from Build Monitor (increased limit for better visibility)
                     logs = await self.api_client.fetch_buildwatch_events(ipv4_addr, limit=100)
@@ -354,7 +335,6 @@ class StatusViewScreen(Screen):
                     if logs:
                         # Update API status - logs success
                         self.api_status['build_monitor_logs'] = {'status': 'success', 'last_code': 200, 'last_error': None}
-                        self.query_one("#api-bm-logs", Static).update(f"[green]✓ 200 OK[/] [dim]({len(logs)} lines)[/]")
                         
                         # Clear logs and repopulate with fresh data (for real-time streaming)
                         log_viewer.clear()
@@ -386,7 +366,6 @@ class StatusViewScreen(Screen):
                         if issues:
                             # Update API status - issues success
                             self.api_status['build_monitor_issues'] = {'status': 'success', 'last_code': 200, 'last_error': None}
-                            self.query_one("#api-bm-issues", Static).update(f"[green]✓ 200 OK[/] [dim]({len(issues)} issues)[/]")
                             
                             # Show unresolved issues
                             unresolved = [i for i in issues if not i.get('resolved', False)]
@@ -412,11 +391,9 @@ class StatusViewScreen(Screen):
                         else:
                             # No issues
                             self.api_status['build_monitor_issues'] = {'status': 'success', 'last_code': 200, 'last_error': None}
-                            self.query_one("#api-bm-issues", Static).update(f"[green]✓ 200 OK[/] [dim](0 issues)[/]")
                     else:
                         # Build Monitor logs not available
                         self.api_status['build_monitor_logs'] = {'status': 'error', 'last_code': 'timeout', 'last_error': 'Connection timeout or service not ready'}
-                        self.query_one("#api-bm-logs", Static).update(f"[yellow]⚠ No data[/] [dim]http://{ipv4_addr}:9090/logs[/]")
                         
                         # Build Monitor service might not be ready yet
                         if not log_viewer.logs:
@@ -424,9 +401,7 @@ class StatusViewScreen(Screen):
                             log_viewer.add_log_line("[dim]Logs will appear here as they're generated.[/]")
                 else:
                     # No IPv4 yet - instance still provisioning
-                    self.query_one("#api-bm-status", Static).update("[dim]⟳ No IPv4 (instance provisioning)[/]")
-                    self.query_one("#api-bm-logs", Static).update("[dim]⟳ No IPv4 (instance provisioning)[/]")
-                    self.query_one("#api-bm-issues", Static).update("[dim]⟳ No IPv4 (instance provisioning)[/]")
+                    # No need to show anything, logs will update when IPv4 is available
                     
                     # No IPv4 or instance not running
                     if not log_viewer.logs:
@@ -434,7 +409,6 @@ class StatusViewScreen(Screen):
             else:
                 # Linode API failed - but update status widget to show we're retrying
                 self.api_status['linode_api'] = {'status': 'error', 'last_code': 'error', 'last_error': 'Failed to fetch instance'}
-                self.query_one("#api-linode", Static).update(f"[red]✕ Failed[/] [dim]Instance {self.instance_id} - retrying...[/]")
                 
                 # Keep the status as "⟳ Connecting..." instead of showing stale data
                 status_widget = self.query_one("#info-status", Static)
@@ -443,7 +417,6 @@ class StatusViewScreen(Screen):
         except Exception as e:
             # Show the actual exception in the UI
             self.api_status['linode_api'] = {'status': 'error', 'last_code': 'exception', 'last_error': str(e)}
-            self.query_one("#api-linode", Static).update(f"[red]✕ Error[/] [dim]{str(e)[:50]}[/]")
             self.notify(f"Error updating status: {e}", severity="error")
     
     def update_footer(self):
@@ -459,6 +432,59 @@ class StatusViewScreen(Screen):
         """Manually refresh status."""
         self.notify("Refreshing...", timeout=1)
         asyncio.create_task(self.update_status())
+    
+    def action_help(self):
+        """Show help and API status."""
+        # Build API status summary
+        api_info = []
+        api_info.append("[bold cyan]🔌 API Status[/]")
+        api_info.append("")
+        
+        # Linode API
+        linode_status = self.api_status.get('linode_api', {})
+        if linode_status.get('status') == 'success':
+            api_info.append(f"[green]✓[/] Linode API (instance data): OK")
+        else:
+            error = linode_status.get('last_error', 'Unknown')
+            api_info.append(f"[red]✕[/] Linode API: {error}")
+        
+        # Build Monitor Status
+        bm_status = self.api_status.get('build_monitor_status', {})
+        if bm_status.get('status') == 'success':
+            api_info.append(f"[green]✓[/] Build Monitor /status: OK")
+        elif bm_status.get('status') == 'error':
+            api_info.append(f"[yellow]⚠[/] Build Monitor /status: Timeout")
+        else:
+            api_info.append(f"[dim]⟳[/] Build Monitor /status: Pending")
+        
+        # Build Monitor Logs
+        bm_logs = self.api_status.get('build_monitor_logs', {})
+        if bm_logs.get('status') == 'success':
+            api_info.append(f"[green]✓[/] Build Monitor /logs: OK")
+        elif bm_logs.get('status') == 'error':
+            api_info.append(f"[yellow]⚠[/] Build Monitor /logs: No data")
+        else:
+            api_info.append(f"[dim]⟳[/] Build Monitor /logs: Pending")
+        
+        # Build Monitor Issues
+        bm_issues = self.api_status.get('build_monitor_issues', {})
+        if bm_issues.get('status') == 'success':
+            api_info.append(f"[green]✓[/] Build Monitor /issues: OK")
+        else:
+            api_info.append(f"[dim]⟳[/] Build Monitor /issues: Pending")
+        
+        api_info.append("")
+        api_info.append("[bold cyan]⌨️ Keyboard Shortcuts[/]")
+        api_info.append("")
+        api_info.append("  [cyan]Esc[/] - Back to dashboard")
+        api_info.append("  [cyan]R[/] - Refresh status")
+        api_info.append("  [cyan]S[/] - Show SSH command")
+        api_info.append("  [cyan]D[/] - Destroy deployment")
+        api_info.append("  [cyan]?[/] - Show this help")
+        api_info.append("  [cyan]Ctrl+C[/] - Quit")
+        
+        help_text = "\n".join(api_info)
+        self.notify(help_text, timeout=10)
     
     def action_ssh(self):
         """Show SSH command."""
