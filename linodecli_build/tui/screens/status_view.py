@@ -204,35 +204,34 @@ class StatusViewScreen(Screen):
                 self.last_update = time.time()
                 self.update_footer()
                 
-                # Fetch BuildWatch events if IPv4 available
+                # Fetch Build Monitor logs if IPv4 available
                 log_viewer = self.query_one(LogViewer)
-                if ipv4_addr and status == "running":
-                    # Try to fetch events from BuildWatch
-                    events = await self.api_client.fetch_buildwatch_events(ipv4_addr, limit=20)
+                if ipv4_addr:
+                    # Try to fetch logs from Build Monitor
+                    logs = await self.api_client.fetch_buildwatch_events(ipv4_addr, limit=50)
                     
-                    if events:
+                    if logs:
                         # Clear old placeholder messages
                         if log_viewer.logs and "[dim]No logs available" in str(log_viewer.logs[0]):
                             log_viewer.clear()
                         
-                        # Update log viewer with events
-                        for event in events:
-                            timestamp = event.get('timestamp', '').split('T')[1][:8] if 'T' in event.get('timestamp', '') else ''
-                            event_type = event.get('type', 'unknown')
-                            container_name = event.get('container', 'unknown')
+                        # Update log viewer with Build Monitor logs
+                        # Each log has: timestamp, message, category, formatted
+                        for log_entry in logs:
+                            formatted = log_entry.get('formatted', '')
+                            message = log_entry.get('message', '')
+                            category = log_entry.get('category', '')
                             
-                            # Format with colors based on event type
-                            if event_type == 'start':
-                                log_viewer.add_log_line(f"[green][{timestamp}][/] {container_name} started")
-                            elif event_type == 'die':
-                                exit_code = event.get('exit_code', '')
-                                log_viewer.add_log_line(f"[red][{timestamp}][/] {container_name} died (exit: {exit_code})")
-                            elif event_type == 'stop':
-                                log_viewer.add_log_line(f"[yellow][{timestamp}][/] {container_name} stopped")
-                            elif event_type == 'restart':
-                                log_viewer.add_log_line(f"[cyan][{timestamp}][/] {container_name} restarted")
-                            else:
-                                log_viewer.add_log_line(f"[dim][{timestamp}][/] {container_name} {event_type}")
+                            # The formatted field already has icons and colors
+                            if formatted:
+                                # Extract just the message part (after timestamp)
+                                # Format: [HH:MM:SS] message
+                                if '] ' in formatted:
+                                    display_msg = formatted.split('] ', 1)[1]
+                                else:
+                                    display_msg = formatted
+                                
+                                log_viewer.add_log_line(display_msg)
                         
                         # Fetch and display issues
                         issues = await self.api_client.fetch_buildwatch_issues(ipv4_addr)
@@ -244,19 +243,25 @@ class StatusViewScreen(Screen):
                                 log_viewer.add_log_line("[bold]⚠ Issues Detected:[/]")
                                 for issue in unresolved[:5]:  # Show up to 5 issues
                                     severity = issue.get('severity', 'info')
-                                    issue_type = issue.get('type', 'unknown')
                                     message = issue.get('message', '')
+                                    recommendation = issue.get('recommendation', '')
                                     
                                     if severity == 'critical':
-                                        log_viewer.add_log_line(f"  [red]✕ CRITICAL:[/] {message}")
+                                        log_viewer.add_log_line(f"  [red]🚨 CRITICAL:[/] {message}")
                                     elif severity == 'warning':
                                         log_viewer.add_log_line(f"  [yellow]⚠ WARNING:[/] {message}")
+                                    elif severity == 'error':
+                                        log_viewer.add_log_line(f"  [red]❌ ERROR:[/] {message}")
                                     else:
                                         log_viewer.add_log_line(f"  [blue]ℹ INFO:[/] {message}")
+                                    
+                                    if recommendation:
+                                        log_viewer.add_log_line(f"    → {recommendation}")
                     else:
-                        # BuildWatch service might not be ready yet
+                        # Build Monitor service might not be ready yet
                         if not log_viewer.logs:
-                            log_viewer.add_log_line("[dim]Waiting for BuildWatch service to start...[/]")
+                            log_viewer.add_log_line("[dim]Waiting for Build Monitor service to start...[/]")
+                            log_viewer.add_log_line("[dim]Logs will appear here as they're generated.[/]")
                 else:
                     # No IPv4 or instance not running
                     if not log_viewer.logs:

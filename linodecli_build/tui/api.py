@@ -203,13 +203,13 @@ class LinodeAPIClient:
     
     async def fetch_buildwatch_status(self, ipv4: str) -> Optional[Dict[str, Any]]:
         """
-        Fetch BuildWatch status from deployed instance.
+        Fetch Build Monitor status from deployed instance.
         
         Args:
             ipv4: Instance IPv4 address
             
         Returns:
-            BuildWatch status dictionary or None on error
+            Build Monitor status dictionary or None on error
         """
         try:
             url = f"http://{ipv4}:9090/status"
@@ -227,17 +227,20 @@ class LinodeAPIClient:
     
     async def fetch_buildwatch_events(self, ipv4: str, limit: int = 50) -> List[Dict[str, Any]]:
         """
-        Fetch recent container events from BuildWatch.
+        Fetch recent logs from Build Monitor.
+        
+        Note: Build Monitor returns logs in a different format than old BuildWatch.
+        Each log entry has: timestamp, message, category, formatted
         
         Args:
             ipv4: Instance IPv4 address
-            limit: Maximum number of events to fetch
+            limit: Maximum number of log lines to fetch
             
         Returns:
-            List of event dictionaries
+            List of log dictionaries
         """
         try:
-            url = f"http://{ipv4}:9090/events?limit={limit}"
+            url = f"http://{ipv4}:9090/logs?lines={limit}"
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
                 self.executor,
@@ -245,8 +248,8 @@ class LinodeAPIClient:
                 url,
                 3  # timeout
             )
-            if response and 'events' in response:
-                return response['events']
+            if response and 'logs' in response:
+                return response['logs']
         except Exception:
             pass
         return []
