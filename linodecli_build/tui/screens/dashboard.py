@@ -140,6 +140,10 @@ class DashboardScreen(Screen):
         """Initialize the dashboard when mounted."""
         self.load_deployments()
         self.refresh_table()
+        # Set focus to the DataTable
+        table = self.query_one(DataTable)
+        table.focus()
+        self.notify(f"DEBUG: Table focused, has {len(self.deployments)} rows", timeout=3)
         # Start animation timer for blinking status indicators
         self._animation_timer = self.set_interval(0.5, self._animate_status)
         # Start auto-refresh timer for API updates
@@ -272,6 +276,12 @@ class DashboardScreen(Screen):
         self.notify("Refreshing deployments...", timeout=1)
         self.load_deployments()
         self.refresh_table()
+    
+    def on_key(self, event):
+        """Debug all key presses."""
+        self.notify(f"DEBUG: Key pressed: {event.key}", timeout=2)
+        if event.key == "enter":
+            self.notify("DEBUG: Enter key detected in on_key!", timeout=3)
     
     def action_view_selected(self):
         """View the selected deployment."""
