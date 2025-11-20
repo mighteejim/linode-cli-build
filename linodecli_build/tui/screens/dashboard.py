@@ -278,10 +278,11 @@ class DashboardScreen(Screen):
         self.refresh_table()
     
     def on_key(self, event):
-        """Debug all key presses."""
+        """Handle key presses and route to appropriate actions."""
         self.notify(f"DEBUG: Key pressed: {event.key}", timeout=2)
         if event.key == "enter":
-            self.notify("DEBUG: Enter key detected in on_key!", timeout=3)
+            self.notify("DEBUG: Enter key detected, calling action!", timeout=3)
+            self.action_view_selected()
     
     def action_view_selected(self):
         """View the selected deployment."""
