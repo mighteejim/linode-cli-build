@@ -76,7 +76,6 @@ class StatusViewScreen(Screen):
         height: auto;
         max-height: 12;
         padding: 0;
-        margin-bottom: 1;
     }
     
     #instance-container {
