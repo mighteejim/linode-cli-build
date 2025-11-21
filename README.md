@@ -101,7 +101,7 @@ That's it! Your LLM API is now running on Linode with GPU support.
 
 ## 📺 Interactive TUI (Beta)
 
-> **🧪 Beta Feature**: The TUI is currently in beta. While fully functional, you may encounter occasional issues. We welcome feedback and bug reports!
+> **🚨 Alert!**: The TUI is probably very buggy‼️ Some things may not work‼️ Thanks‼️
 
 Monitor and manage deployments with the interactive Terminal User Interface:
 
