@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List, Dict, Optional
 from textual.screen import ModalScreen
 from textual.containers import Container, Vertical, Horizontal, ScrollableContainer
-from textual.widgets import Header, Footer, Static, DataTable, Input, Button, Checkbox, Label
+from textual.widgets import Static, DataTable, Input, Button, Checkbox, Label
 from textual.binding import Binding
 from rich.text import Text
 
@@ -107,11 +107,9 @@ class TemplateSelectionScreen(ModalScreen):
     
     def on_mount(self):
         """Load templates when screen mounts."""
-        self.notify("Template screen mounted", timeout=2)
         self.load_templates()
         table = self.query_one(DataTable)
         table.focus()
-        self.notify(f"Table focused, {len(self.templates)} templates loaded", timeout=2)
     
     def load_templates(self):
         """Load all available templates."""
@@ -143,11 +141,8 @@ class TemplateSelectionScreen(ModalScreen):
     
     def action_select(self):
         """Select the current template and move to next step."""
-        self.notify("action_select called!", timeout=3)
         table = self.query_one(DataTable)
         cursor_row = table.cursor_row
-        
-        self.notify(f"Cursor row: {cursor_row}, Templates: {len(self.templates)}", timeout=3)
         
         if cursor_row is None or cursor_row >= len(self.templates):
             self.notify("Please select a template", severity="warning")
@@ -159,21 +154,16 @@ class TemplateSelectionScreen(ModalScreen):
         # Set default app name
         self.coordinator.set('app_name', selected_template.name)
         
-        self.notify(f"Selected: {selected_template.display_name}", timeout=2)
-        
         # Move to region selection
         self.app.push_screen(RegionSelectionScreen(self.coordinator))
     
     def on_data_table_row_selected(self, event: DataTable.RowSelected):
         """Handle row selection via Enter key or click."""
-        self.notify("on_data_table_row_selected fired!", timeout=3)
         self.action_select()
     
     def on_key(self, event):
         """Handle key presses - explicitly handle Enter."""
-        self.notify(f"Key pressed: {event.key}", timeout=1)
         if event.key == "enter":
-            self.notify("Enter detected, calling action_select", timeout=2)
             self.action_select()
             event.prevent_default()
             event.stop()
@@ -254,11 +244,9 @@ class RegionSelectionScreen(ModalScreen):
     
     def on_mount(self):
         """Load regions when screen mounts."""
-        self.notify("Region screen mounted", timeout=2)
         self.load_regions()
         table = self.query_one(DataTable)
         table.focus()
-        self.notify(f"Table focused, {len(self.region_list)} regions loaded", timeout=2)
     
     def load_regions(self):
         """Load regions from API grouped by geography."""
@@ -343,16 +331,13 @@ class RegionSelectionScreen(ModalScreen):
     
     def on_key(self, event):
         """Handle key presses - explicitly handle Enter."""
-        self.notify(f"Region key: {event.key}", timeout=1)
         if event.key == "enter":
-            self.notify("Region: Enter detected, calling action_select", timeout=2)
             self.action_select()
             event.prevent_default()
             event.stop()
     
     def action_select(self):
         """Select region and move to next step."""
-        self.notify("Region action_select called!", timeout=3)
         table = self.query_one(DataTable)
         cursor_row = table.cursor_row
         
@@ -376,7 +361,6 @@ class RegionSelectionScreen(ModalScreen):
             
             if selected_region:
                 self.coordinator.set('region', selected_region.get('id'))
-                self.notify(f"Selected region: {selected_region.get('id')}", timeout=1)
                 self.app.push_screen(PlanSelectionScreen(self.coordinator))
             else:
                 self.notify("Invalid selection", severity="warning")
@@ -585,7 +569,6 @@ class PlanSelectionScreen(ModalScreen):
             
             if selected_type:
                 self.coordinator.set('instance_type', selected_type.get('id'))
-                self.notify(f"Selected plan: {selected_type.get('id')}", timeout=1)
                 self.app.push_screen(ConfigurationScreen(self.coordinator))
             else:
                 self.notify("Invalid selection", severity="warning")

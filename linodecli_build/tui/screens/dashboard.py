@@ -5,12 +5,11 @@ import asyncio
 from datetime import datetime
 from pathlib import Path
 from textual.screen import Screen
-from textual.containers import Container, Vertical, ScrollableContainer, Horizontal, Center, Middle
+from textual.containers import Container, Vertical, ScrollableContainer, Horizontal
 from textual.widgets import Header, Footer, Static, DataTable
 from textual.binding import Binding
 from rich.text import Text
 
-from ..utils import load_deployment_state, format_timestamp
 from ..api import LinodeAPIClient
 
 
@@ -356,7 +355,6 @@ class DashboardScreen(Screen):
     
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Handle row selection in the data table (Enter key)."""
-        self.notify("DEBUG: Event handler called", timeout=2)
         # Call the same logic as action_view_selected
         self.action_view_selected()
     
