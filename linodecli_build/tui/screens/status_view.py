@@ -74,7 +74,7 @@ class StatusViewScreen(Screen):
     
     #panels-container {
         height: auto;
-        max-height: 15;
+        max-height: 12;
         padding: 0;
     }
     
@@ -92,7 +92,16 @@ class StatusViewScreen(Screen):
     
     #logs-container {
         height: 1fr;
+        min-height: 20;
         padding: 0 1;
+    }
+    
+    #logs-header {
+        height: 1;
+        background: $panel;
+        padding: 0 1;
+        color: $text;
+        text-style: bold;
     }
     
     #footer-info {
@@ -203,6 +212,7 @@ class StatusViewScreen(Screen):
                     yield ContainerPanel()
             
             # Logs section - Real-time streaming
+            yield Static("📋 Logs", id="logs-header")
             with Container(id="logs-container"):
                 yield LogViewer(title="Build Monitor Logs")
         
