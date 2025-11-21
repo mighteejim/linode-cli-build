@@ -85,7 +85,12 @@ setup:
         def predict(data: dict):
             request_count.inc()
             with request_duration.time():
-                result = {"prediction": "example_output"}
+                # TODO: Replace with actual model inference
+                # Example: model_output = model(data)
+                result = {
+                    "prediction": "model_prediction_here",
+                    "gpu_used": torch.cuda.is_available()
+                }
                 return result
         
         if __name__ == "__main__":
