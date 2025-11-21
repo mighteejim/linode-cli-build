@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "linodecli-build"
-version = "0.2.0"
+version = "0.2.1"
 description = "linode-cli plugin for deploying applications with declarative templates"
 readme = "README.md"
 requires-python = ">=3.9"
