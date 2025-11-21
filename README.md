@@ -31,8 +31,8 @@ This plugin uses your existing `linode-cli` authentication and configuration.
 
 ```bash
 # Clone the repository
-git clone https://github.com/linode/linode-cli-ai.git
-cd linode-cli-ai
+git clone https://github.com/linode/linode-cli-build.git
+cd linode-cli-build
 
 # Install in editable mode
 pip install -e .
