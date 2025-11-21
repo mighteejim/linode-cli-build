@@ -5,7 +5,7 @@ import asyncio
 from datetime import datetime
 from pathlib import Path
 from textual.screen import Screen
-from textual.containers import Container, Vertical, ScrollableContainer, Horizontal
+from textual.containers import Container, Vertical, ScrollableContainer, Horizontal, Center, Middle
 from textual.widgets import Header, Footer, Static, DataTable
 from textual.binding import Binding
 from rich.text import Text
@@ -23,6 +23,7 @@ class DashboardScreen(Screen):
         Binding("r", "refresh", "Refresh"),
         Binding("enter", "view_selected", "View Status"),
         Binding("d", "destroy_selected", "Destroy"),
+        Binding("i", "init_wizard", "New Deployment"),
         Binding("?", "help", "Help"),
         Binding("ctrl+c", "quit", "Quit"),
     ]
@@ -75,6 +76,24 @@ class DashboardScreen(Screen):
         background: $panel;
     }
     
+    #empty-state {
+        height: 1fr;
+        align: center middle;
+    }
+    
+    #empty-state-panel {
+        width: 60;
+        height: auto;
+        padding: 2;
+        background: $panel;
+        border: thick $primary;
+        content-align: center middle;
+    }
+    
+    .empty-message {
+        text-align: center;
+    }
+    
     #help-text {
         height: 3;
         padding: 0 1;
@@ -88,9 +107,10 @@ class DashboardScreen(Screen):
     }
     """
     
-    def __init__(self, api_client: LinodeAPIClient, current_dir: str = None, *args, **kwargs):
+    def __init__(self, api_client: LinodeAPIClient, current_dir: str = None, config = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.api_client = api_client
+        self.config = config  # Store config for init wizard
         self.current_dir = current_dir or os.getcwd()
         self.deployments = []
         self._animation_timer = None
@@ -121,10 +141,14 @@ class DashboardScreen(Screen):
         with Container(id="deployments-container"):
             with Container(id="deployments-panel"):
                 yield DataTable()
+                # Empty state (hidden by default)
+                with Container(id="empty-state"):
+                    with Container(id="empty-state-panel"):
+                        yield Static("📦 No deployments found\n\nPress \\[I] to initialize a new deployment", classes="empty-message")
         
         # Help text
         yield Static(
-            "↑↓ Navigate  [Enter] View Status  [D] Destroy  [R] Refresh  [Q] Quit  [?] Help",
+            "↑↓ Navigate  [I] New Deployment  [Enter] View  [D] Destroy  [R] Refresh  [Q] Quit  [?] Help",
             id="help-text"
         )
         
@@ -233,24 +257,28 @@ class DashboardScreen(Screen):
     def refresh_table(self):
         """Refresh the deployments table."""
         table = self.query_one(DataTable)
-        table.clear(columns=True)
+        empty_state = self.query_one("#empty-state")
         
-        # Add columns
-        table.add_column("ID", width=10)
-        table.add_column("Application", width=18)
-        table.add_column("Environment", width=12)
-        table.add_column("Plan", width=16)
-        table.add_column("Region", width=10)
-        table.add_column("Status", width=18)
-        table.add_column("Directory", width=40)
-        
-        # Add rows
+        # Show/hide empty state based on deployments
         if not self.deployments:
-            # Show message if no deployments found
-            table.add_row("", "No deployments found", "", "", "", "", "")
-            table.add_row("", "", "", "", "", "", "")
-            table.add_row("", "Run 'linode-cli build init <template>' to create one", "", "", "", "", "")
+            table.display = False
+            empty_state.display = True
         else:
+            table.display = True
+            empty_state.display = False
+            
+            table.clear(columns=True)
+            
+            # Add columns
+            table.add_column("ID", width=10)
+            table.add_column("Application", width=18)
+            table.add_column("Environment", width=12)
+            table.add_column("Plan", width=16)
+            table.add_column("Region", width=10)
+            table.add_column("Status", width=18)
+            table.add_column("Directory", width=40)
+            
+            # Add rows
             for deployment in self.deployments:
                 status = deployment.get("status", "unknown")
                 status_text = self._get_status_indicator(status)
@@ -426,6 +454,7 @@ class DashboardScreen(Screen):
 Dashboard Commands:
 
   ↑↓ / j/k     - Navigate deployments
+  I            - Start new deployment wizard
   Enter        - View deployment status
   D            - Destroy deployment
   R            - Refresh list
@@ -433,12 +462,27 @@ Dashboard Commands:
   ?            - Show this help
 
 Tips:
-  - Deployments are loaded from the current directory and subdirectories
+  - Press 'I' to start the interactive deployment wizard
+  - Deployments are loaded from the Linode API
   - Select a deployment and press Enter to view its live status
-  - Use 'linode-cli build init <template>' to create new deployments
   - Press D to destroy a deployment (with confirmation)
 """
         self.notify(help_text, timeout=15)
+    
+    def action_init_wizard(self):
+        """Launch the init wizard flow."""
+        if not self.config:
+            self.notify(
+                "Config not available. Wizard requires API access.",
+                severity="error",
+                timeout=5
+            )
+            return
+        
+        from .init_wizard import TemplateSelectionScreen, InitWizardCoordinator
+        
+        coordinator = InitWizardCoordinator(self.api_client, self.config)
+        self.app.push_screen(TemplateSelectionScreen(coordinator))
     
     def action_quit(self):
         """Quit the application."""

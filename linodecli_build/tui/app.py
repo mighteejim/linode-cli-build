@@ -118,7 +118,8 @@ class BuildTUI(App):
             self.push_screen(
                 DashboardScreen(
                     self.api_client,
-                    self.directory
+                    self.directory,
+                    config=self.config  # Pass config for init wizard
                 )
             )
         else:

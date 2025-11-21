@@ -10,65 +10,16 @@ import yaml
 
 from ..core import templates as template_core
 from ..core import colors
+from ..core import init_operations
 
 
+# Use the core function (kept for backwards compatibility)
 def _load_template_from_name_or_path(name_or_path: str, version: str | None = None):
     """Load template from either a name (bundled/remote) or a local path.
     
-    Args:
-        name_or_path: Template name (e.g., 'llm-api') or local path (e.g., './my-template' or '/abs/path')
-        version: Version for named templates (ignored for paths)
-    
-    Returns:
-        Template instance
+    This is now a wrapper around core.init_operations.load_template_from_name_or_path
     """
-    # Check if it's a file path
-    # Paths: ./ ../ / ~ or just . or ..
-    is_path = (
-        name_or_path in ('.', '..') or
-        name_or_path.startswith(('./', '../', '/', '~')) or
-        '/' in name_or_path  # Contains slash = probably a path
-    )
-    
-    if is_path:
-        path = Path(name_or_path).expanduser().resolve()
-        
-        # If it's a directory, look for template.yml or template-stub.yml
-        if path.is_dir():
-            template_file = path / "template.yml"
-            if not template_file.exists():
-                # Try template-stub.yml
-                template_file = path / "template-stub.yml"
-                if not template_file.exists():
-                    raise FileNotFoundError(
-                        f"No template.yml or template-stub.yml found in {path}"
-                    )
-        elif path.is_file() and path.suffix in ['.yml', '.yaml']:
-            template_file = path
-        else:
-            raise FileNotFoundError(f"Template path not found: {path}")
-        
-        # Load the template from file
-        try:
-            with open(template_file, 'r') as f:
-                data = yaml.safe_load(f)
-        except Exception as e:
-            raise template_core.TemplateError(f"Error loading template from {template_file}: {e}")
-        
-        if not isinstance(data, dict):
-            raise template_core.TemplateError(f"Template file must contain a YAML object: {template_file}")
-        
-        # Create Template instance
-        return template_core.Template(
-            name=data.get("name", path.stem),
-            display_name=data.get("display_name", data.get("name", path.stem)),
-            version=str(data.get("version", "0.0.0")),
-            description=data.get("description", "").strip(),
-            data=data,
-        )
-    else:
-        # It's a template name, use the standard loader
-        return template_core.load_template(name_or_path, version=version)
+    return init_operations.load_template_from_name_or_path(name_or_path, version)
 
 
 def register(subparsers: argparse._SubParsersAction, config) -> None:
@@ -171,58 +122,13 @@ def _ensure_can_write(path: Path) -> None:
 
 
 def _render_env_example(template) -> List[str]:
-    env_cfg = template.data.get("env", {})
-    lines: List[str] = []
-    
-    # Add required variables
-    required = env_cfg.get("required", [])
-    if required:
-        lines.append("# Required environment variables")
-        for item in required:
-            name = item.get("name")
-            desc = item.get("description", "")
-            if desc:
-                # Handle multi-line descriptions - prefix each line with #
-                for line in desc.strip().split('\n'):
-                    lines.append(f"# {line}")
-            lines.append(f"{name}=")
-            lines.append("")
-    
-    # Add optional variables
-    optional = env_cfg.get("optional", [])
-    if optional:
-        if required:
-            lines.append("")
-        lines.append("# Optional environment variables")
-        for item in optional:
-            name = item.get("name")
-            desc = item.get("description", "")
-            if desc:
-                # Handle multi-line descriptions - prefix each line with #
-                for line in desc.strip().split('\n'):
-                    lines.append(f"# {line}")
-            lines.append(f"# {name}=")
-            lines.append("")
-    
-    if not lines:
-        lines.append("# No environment variables required for this template.")
-    
-    return lines
+    """Generate .env.example content - wrapper around core function."""
+    return init_operations.generate_env_example(template)
 
 
 def _render_readme(template) -> str:
-    description = template.description or template.display_name
-    content = [
-        f"# {template.display_name}",
-        "",
-        description,
-        "",
-        "## Quickstart",
-        "",
-        "1. Copy `.env.example` to `.env` and fill in any required values.",
-        "2. Deploy with `linode-cli build deploy`.",
-    ]
-    return "\n".join(content) + "\n"
+    """Generate README.md content - wrapper around core function."""
+    return init_operations.generate_readme(template)
 
 
 def _interactive_configure(config, deploy_data: dict) -> dict:
@@ -285,196 +191,10 @@ def _interactive_configure(config, deploy_data: dict) -> dict:
 
 
 def _select_region(regions, default: str) -> str:
-    """Interactive region selection grouped by geography."""
-    import sys
-    
-    # Geographic groupings based on country codes
-    geo_groups = {
-        'Americas': ['us', 'ca'],
-        'South America': ['br', 'cl', 'ar'],
-        'Europe': ['gb', 'uk', 'de', 'fr', 'nl', 'se', 'it', 'es', 'pl'],
-        'Asia': ['jp', 'sg', 'in', 'id', 'kr', 'ae'],
-        'Oceania': ['au', 'nz']
-    }
-    
-    # Group regions by geography
-    grouped = {geo: [] for geo in geo_groups}
-    other = []
-    
-    for region in regions:
-        region_id = region.get('id', '')
-        country_code = region_id.split('-')[0] if '-' in region_id else ''
-        
-        placed = False
-        for geo, codes in geo_groups.items():
-            if country_code in codes:
-                grouped[geo].append(region)
-                placed = True
-                break
-        
-        if not placed:
-            other.append(region)
-    
-    # Build ordered list of all regions
-    all_regions = []
-    
-    print()
-    print(colors.header("Available Regions:"))
-    print("=" * 70)
-    
-    # Display each geographic group
-    for geo in ['Americas', 'Europe', 'Asia', 'South America', 'Oceania']:
-        group_regions = sorted(grouped[geo], key=lambda r: r.get('id', ''))
-        if not group_regions:
-            continue
-            
-        print()
-        print(colors.bold(f"{geo}:"))
-        print("-" * 70)
-        
-        for region in group_regions:
-            region_id = region.get('id', 'unknown')
-            label = region.get('label', region_id)
-            status = region.get('status', 'unknown')
-            status_icon = colors.success("✓") if status == "ok" else colors.error("✗")
-            default_marker = colors.default(" (default)") if region_id == default else ""
-            idx = len(all_regions) + 1
-            all_regions.append(region)
-            print(f"{idx:3}. {status_icon} {colors.value(region_id):20} - {label}{default_marker}")
-    
-    # Display other regions if any
-    if other:
-        print()
-        print("Other:")
-        print("-" * 70)
-        for region in sorted(other, key=lambda r: r.get('id', '')):
-            region_id = region.get('id', 'unknown')
-            label = region.get('label', region_id)
-            status = region.get('status', 'unknown')
-            status_icon = "✓" if status == "ok" else "✗"
-            default_marker = " (default)" if region_id == default else ""
-            idx = len(all_regions) + 1
-            all_regions.append(region)
-            print(f"{idx:3}. {status_icon} {region_id:20} - {label}{default_marker}")
-    
-    print("=" * 70)
-    
-    # Get user selection
-    while True:
-        prompt = f"\nSelect region [1-{len(all_regions)}] (Enter for default: {colors.default(default)}): "
-        choice = input(prompt).strip()
-        
-        if not choice:
-            return default
-        
-        try:
-            idx = int(choice) - 1
-            if 0 <= idx < len(all_regions):
-                return all_regions[idx].get('id')
-            else:
-                print(f"Invalid choice. Please enter 1-{len(all_regions)}")
-        except ValueError:
-            print("Invalid input. Please enter a number.")
+    """Interactive region selection - wrapper around core function."""
+    return init_operations.select_region_interactive(regions, default, input_func=input)
 
 
 def _select_instance_type(types, default: str) -> str:
-    """Interactive instance type selection grouped by plan type."""
-    import sys
-    
-    # Categorize types by plan type
-    categorized = {
-        'GPU Linodes': [],
-        'Accelerated Linodes': [],
-        'Premium Linodes': [],
-        'High Memory Linodes': [],
-        'Dedicated CPU': [],
-        'Shared CPU': []
-    }
-    
-    for t in types:
-        type_id = t.get('id', '')
-        type_class = t.get('class', '')
-        
-        if type_class == 'gpu':
-            categorized['GPU Linodes'].append(t)
-        elif type_class == 'accelerated':
-            categorized['Accelerated Linodes'].append(t)
-        elif type_class == 'premium' or type_id.startswith('g7-premium'):
-            categorized['Premium Linodes'].append(t)
-        elif 'highmem' in type_id:
-            categorized['High Memory Linodes'].append(t)
-        elif 'dedicated' in type_id or type_class == 'dedicated':
-            categorized['Dedicated CPU'].append(t)
-        elif type_class == 'standard':
-            categorized['Shared CPU'].append(t)
-    
-    # Sort each category by price
-    for category in categorized:
-        categorized[category].sort(key=lambda t: t.get('price', {}).get('hourly', 0))
-    
-    print()
-    print(colors.header("Available Instance Types:"))
-    print("=" * 90)
-    
-    all_types = []
-    
-    # Display categories in order
-    category_order = [
-        'GPU Linodes',
-        'Accelerated Linodes', 
-        'Premium Linodes',
-        'High Memory Linodes',
-        'Dedicated CPU',
-        'Shared CPU'
-    ]
-    
-    for category in category_order:
-        category_types = categorized[category]
-        if not category_types:
-            continue
-            
-        print()
-        print(colors.bold(f"{category}:"))
-        print("-" * 90)
-        
-        # Limit displayed items for large categories
-        display_limit = len(category_types) if category in ['GPU Linodes', 'Accelerated Linodes'] else 15
-        
-        for t in category_types[:display_limit]:
-            type_id = t.get('id', 'unknown')
-            default_marker = colors.default(" (default)") if type_id == default else ""
-            idx = len(all_types) + 1
-            all_types.append(t)
-            price = t.get('price', {}).get('hourly', 0)
-            memory = t.get('memory', 0)
-            vcpus = t.get('vcpus', 0)
-            disk = t.get('disk', 0)
-            gpus = t.get('gpus', 0)
-            
-            # Show GPU count for GPU instances
-            gpu_info = colors.info(f"  {gpus} GPUs") if gpus > 0 else ""
-            
-            print(f"{idx:3}. {colors.value(type_id):30} {colors.info(f'${price:7.2f}/hr')}  "
-                  f"{memory:6}MB RAM  {vcpus:2} vCPUs  {disk:8}MB{gpu_info}{default_marker}")
-        
-        if len(category_types) > display_limit:
-            print(colors.dim(f"     ... and {len(category_types) - display_limit} more"))
-    
-    print("=" * 90)
-    
-    # Get user selection
-    while True:
-        prompt = f"\nSelect instance type [1-{len(all_types)}] (Enter for default: {colors.default(default)}): "
-        choice = input(prompt).strip()
-        
-        if not choice:
-            return default
-        
-        try:
-            idx = int(choice) - 1
-            if 0 <= idx < len(all_types):
-                return all_types[idx].get('id')
-            else:
-                print(f"Invalid choice. Please enter 1-{len(all_types)}")
-        except ValueError:
-            print("Invalid input. Please enter a number.")
+    """Interactive instance type selection - wrapper around core function."""
+    return init_operations.select_instance_type_interactive(types, default, input_func=input)
