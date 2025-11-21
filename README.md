@@ -302,10 +302,9 @@ Customize once, deploy anywhere!
 
 ## 📚 Documentation
 
-- **[Capabilities Reference](docs/capabilities.md)** - Complete guide to all capabilities (GPU, Docker, Redis, BuildWatch, etc.)
-- **[Template Development Guide](docs/template-development.md)** - Create custom templates
-- **[Template Deployment Guide](docs/template-deployments.md)** - Deep dive into deployments
-- **[Quick Reference](docs/template-quick-reference.md)** - Common patterns and examples
+- **[User Guide](docs/GUIDE.md)** - Complete guide to deploying and managing applications
+- **[Template Development](docs/TEMPLATES.md)** - Create and publish your own templates
+- **[Capabilities Reference](docs/CAPABILITIES.md)** - Complete guide to all capabilities (GPU, Docker, Redis, BuildWatch, etc.)
 
 ---
 

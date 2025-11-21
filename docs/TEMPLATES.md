@@ -1,6 +1,6 @@
 # Template Development Guide
 
-This guide covers everything you need to know about creating, testing, and publishing templates for linode-cli-ai.
+Complete guide to creating, testing, and publishing templates for `linode-cli build`.
 
 ## Table of Contents
 
@@ -8,11 +8,12 @@ This guide covers everything you need to know about creating, testing, and publi
 2. [Quick Start](#quick-start)
 3. [Template Structure](#template-structure)
 4. [Capabilities System](#capabilities-system)
-5. [Custom Setup Scripts](#custom-setup-scripts)
-6. [Best Practices](#best-practices)
-7. [LLM-Assisted Development](#llm-assisted-development)
-8. [Validation and Testing](#validation-and-testing)
-9. [Publishing Templates](#publishing-templates)
+5. [Best Practices](#best-practices)
+6. [LLM-Assisted Development](#llm-assisted-development)
+7. [Validation and Testing](#validation-and-testing)
+8. [Publishing Templates](#publishing-templates)
+
+---
 
 ## Overview
 
@@ -24,6 +25,8 @@ Templates define how to deploy AI services to Linode cloud instances. They speci
 - **How to use**: Documentation, examples, and guidance
 
 Templates use a **declarative approach** with the capabilities system, making them easy to create and maintain without writing shell scripts.
+
+---
 
 ## Quick Start
 
@@ -52,7 +55,7 @@ linode-cli build templates scaffold my-api --llm-assist
 # "@my-api/llm-instructions.md complete this template"
 ```
 
-### Option 2: Interactive (Traditional)
+### Option 2: Interactive
 
 Answer detailed questions to generate a complete template:
 
@@ -71,6 +74,8 @@ linode-cli build templates scaffold my-api
 ### Option 3: Manual Creation
 
 Create from scratch following the [Template Structure](#template-structure).
+
+---
 
 ## Template Structure
 
@@ -134,6 +139,8 @@ guidance:
       command: curl http://{host}/health
 ```
 
+---
+
 ## Capabilities System
 
 The capabilities system lets you declare requirements without writing setup scripts.
@@ -164,6 +171,7 @@ capabilities:
     - nodejs-18           # Node.js 18 runtime
     - redis               # Redis server
     - postgresql-14       # PostgreSQL 14 server
+    - buildwatch          # Container monitoring
 ```
 
 Available features:
@@ -182,11 +190,11 @@ Available features:
 | `postgresql-15` | PostgreSQL 15 server |
 | `buildwatch` | Container monitoring and issue detection |
 
-## BuildWatch Monitoring
+### BuildWatch Monitoring
 
 BuildWatch provides real-time Docker container monitoring and issue detection.
 
-### Basic Usage
+#### Basic Usage
 
 ```yaml
 capabilities:
@@ -194,7 +202,7 @@ capabilities:
     - buildwatch
 ```
 
-### Configuration Options
+#### Configuration Options
 
 ```yaml
 capabilities:
@@ -206,7 +214,7 @@ capabilities:
         enable_metrics: true    # Resource metrics (default: true)
 ```
 
-### Features
+#### Features
 
 - Real-time Docker event streaming
 - Automatic issue detection (OOM kills, crash loops)
@@ -214,22 +222,22 @@ capabilities:
 - Container lifecycle tracking
 - Resource metrics collection
 
-### API Endpoints
+#### API Endpoints
 
 - `http://<instance-ip>:9090/health` - Service health
 - `http://<instance-ip>:9090/status` - Current status
 - `http://<instance-ip>:9090/events` - Recent events
 - `http://<instance-ip>:9090/issues` - Detected issues
 
-### When to Use
+#### When to Use BuildWatch
 
+✅ **Recommended:**
 - GPU workloads (detect OOM issues)
 - Production deployments (issue alerting)
 - Long-running services (uptime tracking)
 - Development (debugging container issues)
 
-### When to Skip
-
+❌ **Skip for:**
 - Simple test deployments
 - Minimal resource usage requirements
 - No container monitoring needed
@@ -255,6 +263,7 @@ capabilities:
     - gpu-nvidia
     - docker-optimize
     - redis
+    - buildwatch
   packages:
     - libopencv-dev
 ```
@@ -263,34 +272,10 @@ This installs:
 - Docker runtime
 - NVIDIA GPU support
 - Redis server
+- BuildWatch monitoring
 - Custom packages
 
-## Custom Setup Scripts
-
-For complex scenarios not covered by capabilities, use custom setup scripts:
-
-```yaml
-setup:
-  script: |
-    #!/bin/bash
-    set -e
-    
-    # Custom installation
-    curl -L https://example.com/installer.sh | bash
-    
-    # Configuration
-    echo "custom_setting=true" > /etc/myapp/config
-  
-  files:
-    - path: /etc/myapp/config.yml
-      permissions: "0644"
-      owner: "root:root"
-      content: |
-        setting: value
-        database_url: ${DATABASE_URL}
-```
-
-**Note**: Prefer capabilities over custom scripts when possible. Custom scripts are harder to maintain and test.
+---
 
 ## Best Practices
 
@@ -384,33 +369,6 @@ container:
     - /models:/models    # Mount model files
 ```
 
-**Common use cases:**
-- Application code written by `setup.files`
-- Persistent data storage
-- Model weights and checkpoints
-- Configuration files
-
-**Example with setup.files:**
-
-```yaml
-container:
-  command: bash /app/start.sh
-  volumes:
-    - /app:/app
-
-setup:
-  files:
-    - path: /app/main.py
-      content: |
-        # Your application code
-    - path: /app/start.sh
-      permissions: "0755"
-      content: |
-        #!/bin/bash
-        pip install -r /app/requirements.txt
-        python /app/main.py
-```
-
 ### 5. Documentation
 
 **Include helpful guidance:**
@@ -480,6 +438,8 @@ tags:
   - production  # or development, experimental
 ```
 
+---
+
 ## LLM-Assisted Development
 
 The LLM-assisted workflow leverages AI to help you create production-ready templates quickly.
@@ -534,63 +494,7 @@ The LLM-assisted workflow leverages AI to help you create production-ready templ
 - **Comprehensive**: All sections filled out with helpful docs
 - **Learning tool**: Study generated templates to understand the system
 
-### Example Workflow
-
-```bash
-# 1. Create scaffold
-$ linode-cli build templates scaffold ml-api --llm-assist
-
-What service do you want to deploy?
-> PyTorch model serving with FastAPI and Redis caching
-
-Does it require GPU? [y/n]: y
-
-Any special dependencies?
-> PyTorch 2.0, Redis for caching, Prometheus metrics
-
-Container image:
-> pytorch/pytorch:2.0-cuda12.0-runtime
-
-Health check endpoint:
-> /health
-
-Expected startup time in seconds:
-> 120
-
-✓ Created ml-api/ directory
-✓ Created llm-instructions.md
-✓ Created template-stub.yml
-
-# 2. In Cursor
-$ cursor ml-api/
-
-# Then in Cursor:
-> @llm-instructions.md Complete this template with support for:
-> - Multiple model formats (PyTorch, ONNX)
-> - Redis caching with TTL
-> - Batch inference
-> - Prometheus metrics at /metrics
-> - Graceful shutdown
-
-# LLM generates complete template.yml
-
-# 3. Validate
-$ linode-cli build templates validate ml-api
-✓ All required fields present
-✓ Schema validation passed
-✓ Template validation successful!
-
-# 4. Test
-$ linode-cli build templates test ml-api --dry-run
-# Shows generated cloud-init
-
-# 5. Deploy
-$ linode-cli build init ml-api
-$ cd ml-api
-$ cp .env.example .env
-# Edit .env
-$ linode-cli build deploy --wait
-```
+---
 
 ## Validation and Testing
 
@@ -629,10 +533,12 @@ linode-cli build deploy --wait
 linode-cli build status
 
 # Clean up
-linode-cli build destroy  # Reads app name from deploy.yml
+linode-cli build destroy
 ```
 
-## Adding Templates to the Plugin
+---
+
+## Publishing Templates
 
 ### Installing Templates for Local Use
 
@@ -671,9 +577,9 @@ To add your template to the bundled templates (available to all users):
 
 Your template will ship with the next plugin release!
 
-## Schema Reference
+---
 
-### Complete Schema
+## Complete Schema Reference
 
 ```yaml
 # Required fields
@@ -688,6 +594,7 @@ capabilities:
   features:
     - gpu-nvidia
     - docker-optimize
+    - buildwatch
     # ... other features
   packages:
     - libcurl4
@@ -708,6 +615,7 @@ deploy:
       external_port: integer    # Host port
       command: string           # Optional CMD override
       env: object               # Default env vars
+      volumes: [string]         # Volume mounts
       
       health:                   # Health check (recommended)
         type: http | tcp | exec
@@ -717,17 +625,6 @@ deploy:
         initial_delay_seconds: integer
         timeout_seconds: integer
         max_retries: integer
-      
-      post_start_script: string # Script after container starts
-
-# Optional custom setup
-setup:
-  script: string                # Custom setup script
-  files:
-    - path: string
-      content: string
-      permissions: string
-      owner: string
 
 # Optional environment variables
 env:
@@ -746,6 +643,8 @@ guidance:
       command: string
 ```
 
+---
+
 ## Troubleshooting
 
 ### Template Won't Validate
@@ -759,14 +658,6 @@ guidance:
 
 **Warning: Using deprecated requires_gpu**
 - Replace `requires_gpu: true` with `capabilities.features: [gpu-nvidia]`
-
-### Cloud-Init Generation Fails
-
-**Error: No capability manager**
-- Add `capabilities.runtime: docker` section
-
-**Error: Invalid runtime**
-- Runtime must be: `docker`, `native`, or `k3s`
 
 ### Health Check Timing
 
@@ -788,14 +679,27 @@ guidance:
 **Warning: GPU capability without GPU instance**
 - Instance type should start with `g6-`
 
+---
+
 ## Additional Resources
 
-- [Template Deployments Guide](template-deployments.md)
-- [Example Templates](../linodecli_build/templates/)
-- [Linode API Documentation](https://www.linode.com/docs/api/)
+- [User Guide](GUIDE.md) - Deployment and usage
+- [Capabilities Reference](CAPABILITIES.md) - Complete capability documentation
+- [Example Templates](../linodecli_build/templates/) - Bundled templates
+
+---
 
 ## Getting Help
 
-- GitHub Issues: [linode-cli-ai/issues](https://github.com/linode/linode-cli-ai/issues)
-- Community Forum: [Linode Community](https://www.linode.com/community/)
-- Documentation: [Linode Docs](https://www.linode.com/docs/)
+```bash
+# Show command help
+linode-cli build templates --help
+linode-cli build templates scaffold --help
+linode-cli build templates validate --help
+
+# Show template details
+linode-cli build templates show <name>
+
+# List available templates
+linode-cli build templates list
+```
